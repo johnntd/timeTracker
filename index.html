@@ -493,6 +493,34 @@
                 }
             };
 
+            // resetHours function
+            const resetHours = async () => {
+    if (!currentUserId) {
+        alert('Please log in first.');
+        return;
+    }
+
+    if (confirm('Are you sure you want to reset all hours after payment?')) {
+        try {
+            const entries = await db.collection('trackerTimeEntries')
+                .where('userId', '==', currentUserId)
+                .get();
+
+            const batch = db.batch();
+            entries.forEach(doc => {
+                batch.delete(doc.ref);
+            });
+
+            await batch.commit();
+            console.log('All time entries deleted for user:', currentUserId);
+            document.getElementById('report').innerHTML = 'Hours reset successfully.';
+        } catch (error) {
+            console.error('Reset hours error:', error);
+            alert(`Error resetting hours: ${error.message}`);
+        }
+    }
+};
+
             // Generate payment report
             const generateReport = async () => {
     if (!currentUserId) {
