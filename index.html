@@ -177,6 +177,7 @@
             <button id="login-btn">Log In</button>
             <button id="logout-btn" disabled>Log Out</button>
             <button id="report-btn">Generate Payment Report</button>
+            <button id="reset-btn">Reset Hours</button>
             <button id="signout-btn">Sign Out</button>
             <div id="status"></div>
             <div id="report"></div>
@@ -366,7 +367,7 @@
             }
 
             // Update hourly rate
-            async function updateHourlyRate() {
+            window.updateHourlyRate = async function() {
                 const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
                 if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
                     alert('Please enter a valid hourly rate greater than 0.');
@@ -383,7 +384,7 @@
                     console.error('Update hourly rate error:', error);
                     alert(`Error updating hourly rate: ${error.message}`);
                 }
-            }
+            };
 
             // Check location periodically
             function checkLocation() {
@@ -424,7 +425,7 @@
             }
 
             // Handle time login
-            async function handleTimeLogin() {
+            window.handleTimeLogin = async function() {
                 if (isLoggedIn) {
                     alert('Already logged in!');
                     return;
@@ -455,10 +456,10 @@
                     console.error('Time login error:', error);
                     alert(`Error logging time: ${error.message}`);
                 }
-            }
+            };
 
             // Handle time logout
-            async function handleTimeLogout() {
+            window.handleTimeLogout = async function() {
                 if (!isLoggedIn) {
                     alert('Not logged in!');
                     return;
@@ -488,10 +489,10 @@
                     console.error('Time logout error:', error);
                     alert(`Error logging time: ${error.message}`);
                 }
-            }
+            };
 
             // Generate payment report
-            async function generateReport() {
+            window.generateReport = async function() {
                 if (!currentUserId) {
                     alert('Please log in first.');
                     return;
@@ -524,8 +525,8 @@
                         <h3>Payment Report for ${username}</h3>
                         <p>Total Hours: ${totalHours.toFixed(2)}</p>
                         <p>Total Pay: $${totalPay.toFixed(2)}</p>
-                        <button onclick="downloadReport(${totalHours}, ${totalPay}, '${username}')">Download PDF</button>
-                        <button onclick="resetHours()">Reset Hours</button>
+                        <button id="download-pdf-btn">Download PDF</button>
+                        <button id="reset-hours-btn">Reset Hours</button>
                     `;
                     console.log('Report generated:', { totalHours, totalPay });
                 } catch (error) {
@@ -536,20 +537,20 @@
                         alert(`Error generating report: ${error.message}`);
                     }
                 }
-            }
+            };
 
             // Download PDF report
-            function downloadReport(totalHours, totalPay, username) {
+            window.downloadReport = function(totalHours, totalPay, username) {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
                 doc.text(`Payment Report for ${username}`, 10, 10);
                 doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 10, 20);
                 doc.text(`Total Pay: $${totalPay.toFixed(2)}`, 10, 30);
                 doc.save(`payment_report_${username}.pdf`);
-            }
+            };
 
             // Reset hours
-            async function resetHours() {
+            window.resetHours = async function() {
                 if (!currentUserId) {
                     alert('Please log in first.');
                     return;
@@ -559,9 +560,11 @@
                         const entries = await db.collection('trackerTimeEntries')
                             .where('userId', '==', currentUserId)
                             .get();
-                        for (const doc of entries.docs) {
-                            await db.collection('trackerTimeEntries').doc(doc.id).delete();
-                        }
+                        const batch = db.batch();
+                        entries.forEach(doc => {
+                            batch.delete(doc.ref);
+                        });
+                        await batch.commit();
                         console.log('All time entries deleted for user:', currentUserId);
                         document.getElementById('report').innerHTML = 'Hours reset successfully.';
                     } catch (error) {
@@ -569,7 +572,7 @@
                         alert(`Error resetting hours: ${error.message}`);
                     }
                 }
-            }
+            };
 
             // Event listeners
             document.getElementById('login-btn-auth').addEventListener('click', handleLogin);
@@ -581,6 +584,13 @@
             document.getElementById('report-btn').addEventListener('click', generateReport);
             document.getElementById('update-rate-btn').addEventListener('click', updateHourlyRate);
             document.getElementById('signout-btn').addEventListener('click', handleSignOut);
+            document.getElementById('reset-hours-btn').addEventListener('click', resetHours);
+            document.getElementById('download-pdf-btn').addEventListener('click', () => {
+                const report = document.getElementById('report').innerHTML.match(/Total Hours: (\d+\.\d+)/)?.[1] || 0;
+                const pay = document.getElementById('report').innerHTML.match(/Total Pay: \$(\d+\.\d+)/)?.[1] || 0;
+                const username = document.getElementById('display-username').textContent;
+                downloadReport(report, pay, username);
+            });
 
             // Auth state listener
             auth.onAuthStateChanged(user => {
