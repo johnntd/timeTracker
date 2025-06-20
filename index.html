@@ -226,28 +226,40 @@
             });
 
             // Toggle between signup and login forms
-            window.showSignup = function() {
-                document.getElementById('login-form').classList.add('hidden');
-                document.getElementById('signup-form').classList.remove('hidden');
-                document.getElementById('login-username').value = '';
-                document.getElementById('login-password').value = '';
+            const showSignup = () => {
+                const loginForm = document.getElementById('login-form');
+                const signupForm = document.getElementById('signup-form');
+                if (loginForm && signupForm) {
+                    loginForm.classList.add('hidden');
+                    signupForm.classList.remove('hidden');
+                    document.getElementById('login-username').value = '';
+                    document.getElementById('login-password').value = '';
+                } else {
+                    console.error('Login or signup form not found');
+                }
             };
 
-            window.showLogin = function() {
-                document.getElementById('signup-form').classList.add('hidden');
-                document.getElementById('login-form').classList.remove('hidden');
-                document.getElementById('signup-username').value = '';
-                document.getElementById('signup-password').value = '';
-                document.getElementById('signup-work-address').value = '';
-                document.getElementById('signup-hourly-rate').value = '';
+            const showLogin = () => {
+                const signupForm = document.getElementById('signup-form');
+                const loginForm = document.getElementById('login-form');
+                if (signupForm && loginForm) {
+                    signupForm.classList.add('hidden');
+                    loginForm.classList.remove('hidden');
+                    document.getElementById('signup-username').value = '';
+                    document.getElementById('signup-password').value = '';
+                    document.getElementById('signup-work-address').value = '';
+                    document.getElementById('signup-hourly-rate').value = '';
+                } else {
+                    console.error('Signup or login form not found');
+                }
             };
 
             // Handle signup
-            window.handleSignup = async function() {
-                const username = document.getElementById('signup-username').value.trim();
-                const password = document.getElementById('signup-password').value;
-                const workAddress = document.getElementById('signup-work-address').value.trim();
-                const hourlyRate = parseFloat(document.getElementById('signup-hourly-rate').value);
+            const handleSignup = async () => {
+                const username = document.getElementById('signup-username')?.value.trim();
+                const password = document.getElementById('signup-password')?.value;
+                const workAddress = document.getElementById('signup-work-address')?.value.trim();
+                const hourlyRate = parseFloat(document.getElementById('signup-hourly-rate')?.value);
 
                 if (!username || username.length < 3) {
                     alert('Username must be at least 3 characters long.');
@@ -307,9 +319,9 @@
             };
 
             // Handle login
-            window.handleLogin = async function() {
-                const username = document.getElementById('login-username').value.trim();
-                const password = document.getElementById('login-password').value;
+            const handleLogin = async () => {
+                const username = document.getElementById('login-username')?.value.trim();
+                const password = document.getElementById('login-password')?.value;
 
                 if (!username || !password) {
                     alert('Please enter both username and password.');
@@ -339,7 +351,7 @@
             };
 
             // Handle sign out
-            window.handleSignOut = async function() {
+            const handleSignOut = async () => {
                 try {
                     if (geolocationWatcher) {
                         navigator.geolocation.clearWatch(geolocationWatcher);
@@ -359,16 +371,22 @@
 
             // Show tracker section
             function showTrackerSection(username, workAddress, hourlyRate) {
-                document.getElementById('auth-section').classList.add('hidden');
-                document.getElementById('tracker-section').classList.remove('hidden');
-                document.getElementById('display-username').textContent = username;
-                document.getElementById('display-work-address').textContent = workAddress;
-                document.getElementById('hourly-rate').value = hourlyRate || 0;
+                const authSection = document.getElementById('auth-section');
+                const trackerSection = document.getElementById('tracker-section');
+                if (authSection && trackerSection) {
+                    authSection.classList.add('hidden');
+                    trackerSection.classList.remove('hidden');
+                    document.getElementById('display-username').textContent = username;
+                    document.getElementById('display-work-address').textContent = workAddress;
+                    document.getElementById('hourly-rate').value = hourlyRate || 0;
+                } else {
+                    console.error('Tracker section or auth section not found');
+                }
             }
 
             // Update hourly rate
-            window.updateHourlyRate = async function() {
-                const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
+            const updateHourlyRate = async () => {
+                const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
                 if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
                     alert('Please enter a valid hourly rate greater than 0.');
                     return;
@@ -425,12 +443,12 @@
             }
 
             // Handle time login
-            window.handleTimeLogin = async function() {
+            const handleTimeLogin = async () => {
                 if (isLoggedIn) {
                     alert('Already logged in!');
                     return;
                 }
-                const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
+                const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
                 if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
                     alert('Please enter a valid hourly rate.');
                     return;
@@ -459,7 +477,7 @@
             };
 
             // Handle time logout
-            window.handleTimeLogout = async function() {
+            const handleTimeLogout = async () => {
                 if (!isLoggedIn) {
                     alert('Not logged in!');
                     return;
@@ -492,24 +510,29 @@
             };
 
             // Generate payment report
-            window.generateReport = async function() {
+            const generateReport = async () => {
                 if (!currentUserId) {
                     alert('Please log in first.');
                     return;
                 }
-                const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
+                const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
                 if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
                     alert('Please enter a valid hourly rate.');
                     return;
                 }
 
                 try {
+                    const userDoc = await db.collection('trackerUsers').doc(currentUserId).get();
+                    if (!userDoc.exists || userDoc.data().username !== document.getElementById('display-username').textContent) {
+                        throw new Error('User profile mismatch');
+                    }
+
                     const entries = await db.collection('trackerTimeEntries')
                         .where('type', '==', 'logout')
                         .where('userId', '==', currentUserId)
                         .orderBy('createdAt', 'desc')
                         .get();
-                    console.log('Query result:', entries);
+                    console.log('Query result for userId:', currentUserId, entries);
 
                     let totalHours = 0;
                     entries.forEach(doc => {
@@ -526,7 +549,7 @@
                         <p>Total Hours: ${totalHours.toFixed(2)}</p>
                         <p>Total Pay: $${totalPay.toFixed(2)}</p>
                         <button id="download-pdf-btn">Download PDF</button>
-                        <button id="reset-hours-btn">Reset Hours</button>
+                        <button id="reset-btn">Reset Hours</button>
                     `;
                     console.log('Report generated:', { totalHours, totalPay });
                 } catch (error) {
@@ -540,7 +563,7 @@
             };
 
             // Download PDF report
-            window.downloadReport = function(totalHours, totalPay, username) {
+            const downloadReport = (totalHours, totalPay, username) => {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
                 doc.text(`Payment Report for ${username}`, 10, 10);
@@ -550,7 +573,7 @@
             };
 
             // Reset hours
-            window.resetHours = async function() {
+            const resetHours = async () => {
                 if (!currentUserId) {
                     alert('Please log in first.');
                     return;
@@ -574,23 +597,51 @@
                 }
             };
 
-            // Event listeners
-            document.getElementById('login-btn-auth').addEventListener('click', handleLogin);
-            document.getElementById('signup-btn').addEventListener('click', showSignup);
-            document.getElementById('create-profile-btn').addEventListener('click', handleSignup);
-            document.getElementById('back-to-login-btn').addEventListener('click', showLogin);
-            document.getElementById('login-btn').addEventListener('click', handleTimeLogin);
-            document.getElementById('logout-btn').addEventListener('click', handleTimeLogout);
-            document.getElementById('report-btn').addEventListener('click', generateReport);
-            document.getElementById('update-rate-btn').addEventListener('click', updateHourlyRate);
-            document.getElementById('signout-btn').addEventListener('click', handleSignOut);
-            document.getElementById('reset-hours-btn').addEventListener('click', resetHours);
-            document.getElementById('download-pdf-btn').addEventListener('click', () => {
-                const report = document.getElementById('report').innerHTML.match(/Total Hours: (\d+\.\d+)/)?.[1] || 0;
-                const pay = document.getElementById('report').innerHTML.match(/Total Pay: \$(\d+\.\d+)/)?.[1] || 0;
-                const username = document.getElementById('display-username').textContent;
-                downloadReport(report, pay, username);
-            });
+            // Attach event listeners with null checks
+            const attachEventListeners = () => {
+                const loginBtnAuth = document.getElementById('login-btn-auth');
+                const signupBtn = document.getElementById('signup-btn');
+                const createProfileBtn = document.getElementById('create-profile-btn');
+                const backToLoginBtn = document.getElementById('back-to-login-btn');
+                const loginBtn = document.getElementById('login-btn');
+                const logoutBtn = document.getElementById('logout-btn');
+                const reportBtn = document.getElementById('report-btn');
+                const updateRateBtn = document.getElementById('update-rate-btn');
+                const signoutBtn = document.getElementById('signout-btn');
+                const resetBtn = document.getElementById('reset-btn');
+                const downloadPdfBtn = document.getElementById('download-pdf-btn');
+
+                if (loginBtnAuth) loginBtnAuth.addEventListener('click', handleLogin);
+                else console.error('login-btn-auth not found');
+                if (signupBtn) signupBtn.addEventListener('click', showSignup);
+                else console.error('signup-btn not found');
+                if (createProfileBtn) createProfileBtn.addEventListener('click', handleSignup);
+                else console.error('create-profile-btn not found');
+                if (backToLoginBtn) backToLoginBtn.addEventListener('click', showLogin);
+                else console.error('back-to-login-btn not found');
+                if (loginBtn) loginBtn.addEventListener('click', handleTimeLogin);
+                else console.error('login-btn not found');
+                if (logoutBtn) logoutBtn.addEventListener('click', handleTimeLogout);
+                else console.error('logout-btn not found');
+                if (reportBtn) reportBtn.addEventListener('click', generateReport);
+                else console.error('report-btn not found');
+                if (updateRateBtn) updateRateBtn.addEventListener('click', updateHourlyRate);
+                else console.error('update-rate-btn not found');
+                if (signoutBtn) signoutBtn.addEventListener('click', handleSignOut);
+                else console.error('signout-btn not found');
+                if (resetBtn) resetBtn.addEventListener('click', resetHours);
+                else console.error('reset-btn not found');
+                if (downloadPdfBtn) downloadPdfBtn.addEventListener('click', () => {
+                    const report = document.getElementById('report').innerHTML.match(/Total Hours: (\d+\.\d+)/)?.[1] || 0;
+                    const pay = document.getElementById('report').innerHTML.match(/Total Pay: \$(\d+\.\d+)/)?.[1] || 0;
+                    const username = document.getElementById('display-username').textContent;
+                    downloadReport(report, pay, username);
+                });
+                else console.error('download-pdf-btn not found');
+            };
+
+            // Attach event listeners after DOM is ready
+            attachEventListeners();
 
             // Auth state listener
             auth.onAuthStateChanged(user => {
