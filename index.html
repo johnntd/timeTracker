@@ -225,24 +225,24 @@
             });
 
             // Toggle between signup and login forms
-            function showSignup() {
+            window.showSignup = function() {
                 document.getElementById('login-form').classList.add('hidden');
                 document.getElementById('signup-form').classList.remove('hidden');
                 document.getElementById('login-username').value = '';
                 document.getElementById('login-password').value = '';
-            }
+            };
 
-            function showLogin() {
+            window.showLogin = function() {
                 document.getElementById('signup-form').classList.add('hidden');
                 document.getElementById('login-form').classList.remove('hidden');
                 document.getElementById('signup-username').value = '';
                 document.getElementById('signup-password').value = '';
                 document.getElementById('signup-work-address').value = '';
                 document.getElementById('signup-hourly-rate').value = '';
-            }
+            };
 
             // Handle signup
-            async function handleSignup() {
+            window.handleSignup = async function() {
                 const username = document.getElementById('signup-username').value.trim();
                 const password = document.getElementById('signup-password').value;
                 const workAddress = document.getElementById('signup-work-address').value.trim();
@@ -266,18 +266,13 @@
                 }
 
                 try {
-                    // Verify authentication state
                     const user = auth.currentUser;
-                    if (user) {
-                        await auth.signOut();
-                    }
+                    if (user) await auth.signOut();
 
-                    // Create user with email (username@timetracker.app)
                     const email = `${username.toLowerCase()}@timetracker.app`;
                     const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                     const userId = userCredential.user.uid;
 
-                    // Geocode work address
                     const result = await new Promise((resolve, reject) => {
                         geocoder.geocode({ address: workAddress }, (results, status) => {
                             if (status === 'OK') resolve(results[0].geometry.location);
@@ -285,23 +280,20 @@
                         });
                     });
 
-                    // Validate geocoding result
                     const lat = result.lat();
                     const lng = result.lng();
                     if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
                         throw new Error('Invalid geolocation coordinates');
                     }
 
-                    // Save user profile
-                    const profileData = {
+                    await db.collection('trackerUsers').doc(userId).set({
                         username,
                         workAddress,
                         workLocation: { lat, lng },
                         hourlyRate,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    await db.collection('trackerUsers').doc(userId).set(profileData);
-                    console.log('Profile saved:', profileData);
+                    });
+                    console.log('Profile saved for userId:', userId);
 
                     currentUserId = userId;
                     workLocation = { lat, lng };
@@ -311,10 +303,10 @@
                     console.error('Signup error:', error);
                     alert(`Error creating profile: ${error.message}`);
                 }
-            }
+            };
 
             // Handle login
-            async function handleLogin() {
+            window.handleLogin = async function() {
                 const username = document.getElementById('login-username').value.trim();
                 const password = document.getElementById('login-password').value;
 
@@ -328,7 +320,6 @@
                     const userCredential = await auth.signInWithEmailAndPassword(email, password);
                     const userId = userCredential.user.uid;
 
-                    // Load user profile
                     const doc = await db.collection('trackerUsers').doc(userId).get();
                     if (doc.exists) {
                         const data = doc.data();
@@ -344,10 +335,10 @@
                     console.error('Login error:', error);
                     alert(`Error logging in: ${error.message}`);
                 }
-            }
+            };
 
             // Handle sign out
-            async function handleSignOut() {
+            window.handleSignOut = async function() {
                 try {
                     if (geolocationWatcher) {
                         navigator.geolocation.clearWatch(geolocationWatcher);
@@ -363,7 +354,7 @@
                     console.error('Sign out error:', error);
                     alert(`Error signing out: ${error.message}`);
                 }
-            }
+            };
 
             // Show tracker section
             function showTrackerSection(username, workAddress, hourlyRate) {
@@ -371,7 +362,7 @@
                 document.getElementById('tracker-section').classList.remove('hidden');
                 document.getElementById('display-username').textContent = username;
                 document.getElementById('display-work-address').textContent = workAddress;
-                document.getElementById('hourly-rate').value = hourlyRate;
+                document.getElementById('hourly-rate').value = hourlyRate || 0;
             }
 
             // Update hourly rate
@@ -399,21 +390,24 @@
                 if (geolocationWatcher) {
                     navigator.geolocation.clearWatch(geolocationWatcher);
                 }
-                geolocationWatcher = navigator.geolocation.watchPosition(position => {
-                    const userLat = position.coords.latitude;
-                    const userLng = position.coords.longitude;
-                    const distance = getDistance(userLat, userLng, workLocation.lat, workLocation.lng);
-                    
-                    if (distance <= geofenceRadius && !isLoggedIn && currentUserId) {
-                        new Notification('Time to log in!', {
-                            body: 'You have arrived at your work location.'
-                        });
-                        document.getElementById('status').innerHTML = 'Please log in to start tracking time.';
-                    }
-                }, error => {
-                    console.error('Geolocation error:', error);
-                    document.getElementById('status').innerHTML = 'Unable to access location. Please log in manually.';
-                }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+                geolocationWatcher = navigator.geolocation.watchPosition(
+                    position => {
+                        const userLat = position.coords.latitude;
+                        const userLng = position.coords.longitude;
+                        const distance = getDistance(userLat, userLng, workLocation.lat, workLocation.lng);
+                        if (distance <= geofenceRadius && !isLoggedIn && currentUserId) {
+                            new Notification('Time to log in!', {
+                                body: 'You have arrived at your work location.'
+                            });
+                            document.getElementById('status').innerHTML = 'Please log in to start tracking time.';
+                        }
+                    },
+                    error => {
+                        console.error('Geolocation error:', error);
+                        document.getElementById('status').innerHTML = 'Unable to access location. Please log in manually.';
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+                );
             }
 
             // Calculate distance in meters
@@ -514,6 +508,7 @@
                         .where('userId', '==', currentUserId)
                         .orderBy('createdAt', 'desc')
                         .get();
+                    console.log('Query result:', entries);
 
                     let totalHours = 0;
                     entries.forEach(doc => {
@@ -535,7 +530,11 @@
                     console.log('Report generated:', { totalHours, totalPay });
                 } catch (error) {
                     console.error('Report error:', error);
-                    alert(`Error generating report: ${error.message}`);
+                    if (error.code === 'unavailable' || error.message.includes('index')) {
+                        alert('Error generating report: The query requires an index. Please create it here: https://console.firebase.google.com/v1/r/project/dulichcali-booking-calendar/firestore/indexes?create_composite=CmZwcm9qZWN0cy9kdWxpY2hjYWxpLWJvb2tpbmctY2FsZW5kYXIvZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL3RyYWNrZXJUaW1lRW50cmllcy9pbmRleGVzL18QARoICgR0eXBlEAEaCgoGdXNlcklkEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg');
+                    } else {
+                        alert(`Error generating report: ${error.message}`);
+                    }
                 }
             }
 
@@ -560,7 +559,6 @@
                         const entries = await db.collection('trackerTimeEntries')
                             .where('userId', '==', currentUserId)
                             .get();
-
                         for (const doc of entries.docs) {
                             await db.collection('trackerTimeEntries').doc(doc.id).delete();
                         }
