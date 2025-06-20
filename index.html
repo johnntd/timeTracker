@@ -213,33 +213,36 @@
             let isLoggedIn = false;
             let loginTime = null;
             let currentUserId = '';
+            let geolocationWatcher = null;
 
             // Request notification permission
             Notification.requestPermission().then(permission => {
                 if (permission !== 'granted') {
-                    alert('Please enable notifications for login/logout prompts.');
+                    document.getElementById('status').innerHTML = 'Notifications disabled. Login prompts may not appear.';
                 }
+            }).catch(error => {
+                console.error('Notification permission error:', error);
             });
 
             // Toggle between signup and login forms
-            window.showSignup = function() {
+            function showSignup() {
                 document.getElementById('login-form').classList.add('hidden');
                 document.getElementById('signup-form').classList.remove('hidden');
                 document.getElementById('login-username').value = '';
                 document.getElementById('login-password').value = '';
-            };
+            }
 
-            window.showLogin = function() {
+            function showLogin() {
                 document.getElementById('signup-form').classList.add('hidden');
                 document.getElementById('login-form').classList.remove('hidden');
                 document.getElementById('signup-username').value = '';
                 document.getElementById('signup-password').value = '';
                 document.getElementById('signup-work-address').value = '';
                 document.getElementById('signup-hourly-rate').value = '';
-            };
+            }
 
             // Handle signup
-            window.handleSignup = async function() {
+            async function handleSignup() {
                 const username = document.getElementById('signup-username').value.trim();
                 const password = document.getElementById('signup-password').value;
                 const workAddress = document.getElementById('signup-work-address').value.trim();
@@ -292,10 +295,10 @@
                 } catch (error) {
                     alert(`Error creating profile: ${error.message}`);
                 }
-            };
+            }
 
             // Handle login
-            window.handleLogin = async function() {
+            async function handleLogin() {
                 const username = document.getElementById('login-username').value.trim();
                 const password = document.getElementById('login-password').value;
 
@@ -324,11 +327,15 @@
                 } catch (error) {
                     alert(`Error logging in: ${error.message}`);
                 }
-            };
+            }
 
             // Handle sign out
-            window.handleSignOut = async function() {
+            async function handleSignOut() {
                 try {
+                    if (geolocationWatcher) {
+                        navigator.geolocation.clearWatch(geolocationWatcher);
+                        geolocationWatcher = null;
+                    }
                     await auth.signOut();
                     currentUserId = '';
                     isLoggedIn = false;
@@ -338,7 +345,7 @@
                 } catch (error) {
                     alert(`Error signing out: ${error.message}`);
                 }
-            };
+            }
 
             // Show tracker section
             function showTrackerSection(username, workAddress, hourlyRate) {
@@ -350,7 +357,7 @@
             }
 
             // Update hourly rate
-            window.updateHourlyRate = async function() {
+            async function updateHourlyRate() {
                 const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
                 if (!hourlyRate || hourlyRate <= 0) {
                     alert('Please enter a valid hourly rate greater than 0.');
@@ -365,11 +372,14 @@
                 } catch (error) {
                     alert(`Error updating hourly rate: ${error.message}`);
                 }
-            };
+            }
 
-            // Check location
+            // Check location periodically
             function checkLocation() {
-                navigator.geolocation.watchPosition(position => {
+                if (geolocationWatcher) {
+                    navigator.geolocation.clearWatch(geolocationWatcher);
+                }
+                geolocationWatcher = navigator.geolocation.watchPosition(position => {
                     const userLat = position.coords.latitude;
                     const userLng = position.coords.longitude;
                     const distance = getDistance(userLat, userLng, workLocation.lat, workLocation.lng);
@@ -383,7 +393,7 @@
                 }, error => {
                     console.error('Geolocation error:', error);
                     document.getElementById('status').innerHTML = 'Unable to access location. Please log in manually.';
-                }, { enableHighAccuracy: true });
+                }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
             }
 
             // Calculate distance in meters
@@ -400,7 +410,7 @@
             }
 
             // Handle time login
-            window.handleTimeLogin = async function() {
+            async function handleTimeLogin() {
                 if (isLoggedIn) {
                     alert('Already logged in!');
                     return;
@@ -424,10 +434,10 @@
                     hourlyRate,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-            };
+            }
 
             // Handle time logout
-            window.handleTimeLogout = async function() {
+            async function handleTimeLogout() {
                 if (!isLoggedIn) {
                     alert('Not logged in!');
                     return;
@@ -450,10 +460,10 @@
                 new Notification('Time to log out!', {
                     body: 'Your work shift has ended.'
                 });
-            };
+            }
 
             // Generate payment report
-            window.generateReport = async function() {
+            async function generateReport() {
                 if (!currentUserId) {
                     alert('Please log in first.');
                     return;
@@ -488,20 +498,20 @@
                 } catch (error) {
                     alert(`Error generating report: ${error.message}`);
                 }
-            };
+            }
 
             // Download PDF report
-            window.downloadReport = function(totalHours, totalPay, username) {
+            function downloadReport(totalHours, totalPay, username) {
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF();
                 doc.text(`Payment Report for ${username}`, 10, 10);
                 doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 10, 20);
                 doc.text(`Total Pay: $${totalPay.toFixed(2)}`, 10, 30);
                 doc.save(`payment_report_${username}.pdf`);
-            };
+            }
 
             // Reset hours
-            window.resetHours = async function() {
+            async function resetHours() {
                 if (!currentUserId) {
                     alert('Please log in first.');
                     return;
@@ -521,7 +531,7 @@
                         alert(`Error resetting hours: ${error.message}`);
                     }
                 }
-            };
+            }
 
             // Event listeners
             document.getElementById('login-btn-auth').addEventListener('click', handleLogin);
@@ -533,6 +543,28 @@
             document.getElementById('report-btn').addEventListener('click', generateReport);
             document.getElementById('update-rate-btn').addEventListener('click', updateHourlyRate);
             document.getElementById('signout-btn').addEventListener('click', handleSignOut);
+
+            // Auth state listener
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    db.collection('trackerUsers').doc(user.uid).get().then(doc => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            currentUserId = user.uid;
+                            workLocation = data.workLocation;
+                            showTrackerSection(data.username, data.workAddress, data.hourlyRate);
+                            document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
+                            checkLocation();
+                        }
+                    }).catch(error => {
+                        console.error('Error loading profile:', error);
+                        document.getElementById('status').innerHTML = `Error loading profile: ${error.message}`;
+                    });
+                } else {
+                    document.getElementById('auth-section').classList.remove('hidden');
+                    document.getElementById('tracker-section').classList.add('hidden');
+                }
+            });
         });
     </script>
 </body>
