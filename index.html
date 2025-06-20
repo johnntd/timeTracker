@@ -495,91 +495,87 @@
 
             // Generate payment report
             const generateReport = async () => {
-                if (!currentUserId) {
-                    alert('Please log in first.');
-                    return;
-                }
-                const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
-                if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
-                    alert('Please enter a valid hourly rate.');
-                    return;
-                }
+    if (!currentUserId) {
+        alert('Please log in first.');
+        return;
+    }
 
-                try {
-                    const userDoc = await db.collection('trackerUsers').doc(currentUserId).get();
-                    if (!userDoc.exists || userDoc.data().username !== document.getElementById('display-username').textContent) {
-                        throw new Error('User profile mismatch');
-                    }
+    const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
+    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
+        alert('Please enter a valid hourly rate.');
+        return;
+    }
 
-                    const entries = await db.collection('trackerTimeEntries')
-                        .where('type', '==', 'logout')
-                        .where('userId', '==', currentUserId)
-                        .orderBy('createdAt', 'desc')
-                        .get();
-                    console.log('Query result for userId:', currentUserId, entries);
+    try {
+        const userDoc = await db.collection('trackerUsers').doc(currentUserId).get();
+        const username = document.getElementById('display-username').textContent;
 
-                    let totalHours = 0;
-                    entries.forEach(doc => {
-                        const hours = doc.data().hoursWorked;
-                        if (hours && !isNaN(hours)) {
-                            totalHours += hours;
-                        }
-                    });
+        if (!userDoc.exists || userDoc.data().username !== username) {
+            throw new Error('User profile mismatch');
+        }
 
-                    const totalPay = totalHours * hourlyRate;
-                    const username = document.getElementById('display-username').textContent;
-                    document.getElementById('report').innerHTML = `
-                        <h3>Payment Report for ${username}</h3>
-                        <p>Total Hours: ${totalHours.toFixed(2)}</p>
-                        <p>Total Pay: $${totalPay.toFixed(2)}</p>
-                        <button id="download-pdf-btn">Download PDF</button>
-                        <button id="reset-btn">Reset Hours</button>
-                    `;
-                    console.log('Report generated:', { totalHours, totalPay });
-                } catch (error) {
-                    console.error('Report error:', error);
-                    if (error.code === 'unavailable' || error.message.includes('index')) {
-                        alert('Error generating report: The query requires an index. Please create it here: https://console.firebase.google.com/v1/r/project/dulichcali-booking-calendar/firestore/indexes?create_composite=CmZwcm9qZWN0cy9kdWxpY2hjYWxpLWJvb2tpbmctY2FsZW5kYXIvZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL3RyYWNrZXJUaW1lRW50cmllcy9pbmRleGVzL18QARoICgR0eXBlEAEaCgoGdXNlcklkEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg');
-                    } else {
-                        alert(`Error generating report: ${error.message}`);
-                    }
-                }
-            };
+        const entries = await db.collection('trackerTimeEntries')
+            .where('type', '==', 'logout')
+            .where('userId', '==', currentUserId)
+            .orderBy('createdAt', 'desc')
+            .get();
+
+        let totalHours = 0;
+        entries.forEach(doc => {
+            const hours = doc.data().hoursWorked;
+            if (hours && !isNaN(hours)) {
+                totalHours += hours;
+            }
+        });
+
+        const totalPay = totalHours * hourlyRate;
+
+        // Inject HTML content for report
+        document.getElementById('report').innerHTML = `
+            <h3>Payment Report for ${username}</h3>
+            <p>Total Hours: ${totalHours.toFixed(2)}</p>
+            <p>Total Pay: $${totalPay.toFixed(2)}</p>
+            <button id="download-pdf-btn">Download PDF</button>
+            <button id="reset-btn">Reset Hours</button>
+        `;
+
+        // Attach listeners AFTER creating buttons
+        document.getElementById('download-pdf-btn')?.addEventListener('click', () => {
+            downloadReport(totalHours, totalPay, username);
+        });
+
+        document.getElementById('reset-btn')?.addEventListener('click', resetHours);
+
+        console.log('Report generated:', { totalHours, totalPay });
+
+    } catch (error) {
+        console.error('Report error:', error);
+        if (error.code === 'unavailable' || error.message.includes('index')) {
+            alert('Error generating report: The query requires an index. Please create it in the Firebase Console.');
+        } else {
+            alert(`Error generating report: ${error.message}`);
+        }
+    }
+};
 
             // Download PDF report
             const downloadReport = (totalHours, totalPay, username) => {
-                const { jsPDF } = window.jspdf;
-                const doc = new jsPDF();
-                doc.text(`Payment Report for ${username}`, 10, 10);
-                doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 10, 20);
-                doc.text(`Total Pay: $${totalPay.toFixed(2)}`, 10, 30);
-                doc.save(`payment_report_${username}.pdf`);
-            };
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
 
-            // Reset hours
-            const resetHours = async () => {
-                if (!currentUserId) {
-                    alert('Please log in first.');
-                    return;
-                }
-                if (confirm('Are you sure you want to reset all hours after payment?')) {
-                    try {
-                        const entries = await db.collection('trackerTimeEntries')
-                            .where('userId', '==', currentUserId)
-                            .get();
-                        const batch = db.batch();
-                        entries.forEach(doc => {
-                            batch.delete(doc.ref);
-                        });
-                        await batch.commit();
-                        console.log('All time entries deleted for user:', currentUserId);
-                        document.getElementById('report').innerHTML = 'Hours reset successfully.';
-                    } catch (error) {
-                        console.error('Reset hours error:', error);
-                        alert(`Error resetting hours: ${error.message}`);
-                    }
-                }
-            };
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(`Payment Report`, 10, 20);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.text(`Name: ${username}`, 10, 35);
+    doc.text(`Total Hours Worked: ${totalHours.toFixed(2)} hrs`, 10, 45);
+    doc.text(`Total Pay: $${totalPay.toFixed(2)}`, 10, 55);
+
+    const date = new Date().toISOString().split('T')[0];
+    doc.save(`payment_report_${username}_${date}.pdf`);
+};
 
             // Attach event listeners with null checks
             const attachEventListeners = () => {
