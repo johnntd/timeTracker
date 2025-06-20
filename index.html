@@ -622,7 +622,6 @@
                 const updateRateBtn = document.getElementById('update-rate-btn');
                 const signoutBtn = document.getElementById('signout-btn');
                 const resetBtn = document.getElementById('reset-btn');
-                const downloadPdfBtn = document.getElementById('download-pdf-btn');
 
                 if (loginBtnAuth) loginBtnAuth.addEventListener('click', handleLogin);
                 else console.error('login-btn-auth not found');
@@ -644,14 +643,7 @@
                 else console.error('signout-btn not found');
                 if (resetBtn) resetBtn.addEventListener('click', resetHours);
                 else console.error('reset-btn not found');
-                if (downloadPdfBtn) downloadPdfBtn.addEventListener('click', () => {
-                    const report = document.getElementById('report').innerHTML.match(/Total Hours: (\d+\.\d+)/)?.[1] || 0;
-                    const pay = document.getElementById('report').innerHTML.match(/Total Pay: \$(\d+\.\d+)/)?.[1] || 0;
-                    const username = document.getElementById('display-username').textContent;
-                    downloadReport(report, pay, username);
-                });
-                else console.error('download-pdf-btn not found');
-            };
+                };
 
             // Attach event listeners after DOM is ready
             attachEventListeners();
