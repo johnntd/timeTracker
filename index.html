@@ -134,7 +134,7 @@
                     <label for="login-password">Password</label>
                     <input type="password" id="login-password" placeholder="Enter password" required>
                 </div>
-                <button onclick="handleLoginAuth()">Login</button>
+                <button onclick="handleLogin()">Login</button>
                 <button onclick="showSignup()">Sign Up</button>
             </div>
             <div id="signup-form" class="hidden">
@@ -144,11 +144,11 @@
                 </div>
                 <div class="form-group">
                     <label for="signup-password">Password</label>
-                    <input type="password" id="signup-password" placeholder="Choose password" required>
+                    <input type="password" id="signup-password" placeholder="Choose password (6+ chars)" required>
                 </div>
                 <div class="form-group">
                     <label for="signup-work-address">Work Address</label>
-                    <input type="text" id="signup-work-address" placeholder="Enter work address" required>
+                    <input type="text" id="signup-work-address" placeholder="Enter work address (e.g., 123 Main St, Los Angeles, CA)" required>
                 </div>
                 <div class="form-group">
                     <label for="signup-hourly-rate">Hourly Rate ($)</label>
@@ -160,22 +160,22 @@
         </section>
 
         <section id="tracker-section" class="section hidden">
-            <h2>Track Working Hours</h2>
+            <h2>Track Work Hours</h2>
             <div class="form-group">
-                <label>Username</label>
+                <label>Username:</label>
                 <span id="display-username"></span>
             </div>
             <div class="form-group">
-                <label>Work Address</label>
+                <label>Work Address:</label>
                 <span id="display-work-address"></span>
             </div>
             <div class="form-group">
-                <label for="hourly-rate">Hourly Rate ($)</label>
+                <label for="hourly-rate">Hourly Rate ($):</label>
                 <input type="number" id="hourly-rate" step="0.01" required>
                 <button onclick="updateHourlyRate()">Update Hourly Rate</button>
             </div>
-            <button id="login-btn" onclick="handleLogin()">Log In</button>
-            <button id="logout-btn" onclick="handleLogout()" disabled>Log Out</button>
+            <button id="login-btn" onclick="handleTimeLogin()">Log In</button>
+            <button id="logout-btn" onclick="handleTimeLogout()" disabled>Log Out</button>
             <button id="report-btn" onclick="generateReport()">Generate Payment Report</button>
             <button onclick="handleSignOut()">Sign Out</button>
             <div id="status"></div>
@@ -188,341 +188,356 @@
     </footer>
 
     <script>
-        // Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyCo1FzDthSCXINRHlyJkqdcVKq_inM71SQ",
-            authDomain: "dulichcali-booking-calendar.firebaseapp.com",
-            projectId: "dulichcali-booking-calendar",
-            storageBucket: "dulichcali-booking-calendar.appspot.com",
-            messagingSenderId: "623460884698",
-            appId: "1:623460884698:web:a08bd435c453a7b4db05e3"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
+        document.addEventListener('DOMContentLoaded', () => {
+            // Firebase configuration
+            const firebaseConfig = {
+                apiKey: "AIzaSyCo1FzDthSCXINRHlyJkqdcVKq_inM71SQ",
+                authDomain: "dulichcali-booking-calendar.firebaseapp.com",
+                projectId: "dulichcali-booking-calendar",
+                storageBucket: "dulichcali-booking-calendar.appspot.com",
+                messagingSenderId: "623460884698",
+                appId: "1:623460884698:web:a08bd435c453a7b4db05e3"
+            };
+            firebase.initializeApp(firebaseConfig);
+            const auth = firebase.auth();
+            const db = firebase.firestore();
 
-        // Geolocation settings
-        let workLocation = { lat: 33.9416, lng: -118.4085 }; // Default: LAX
-        const geofenceRadius = 500; // meters
-        let isLoggedIn = false;
-        let loginTime = null;
-        let currentUserId = '';
+            // Geolocation settings
+            let workLocation = { lat: 33.9416, lng: -118.4085 }; // Default: LAX
+            const geofenceRadius = 500; // meters
+            let isLoggedIn = false;
+            let loginTime = null;
+            let currentUserId = '';
 
-        // Initialize Google Maps Geocoder
-        const geocoder = new google.maps.Geocoder();
+            // Initialize Google Maps Geocoder
+            const geocoder = new google.maps.Geocoder();
 
-        // Request notification permission
-        Notification.requestPermission().then(permission => {
-            if (permission !== 'granted') {
-                alert('Please enable notifications for login/logout prompts.');
-            }
-        });
-
-        // Toggle between login and signup forms
-        function showSignup() {
-            document.getElementById('login-form').classList.add('hidden');
-            document.getElementById('signup-form').classList.remove('hidden');
-        }
-
-        function showLogin() {
-            document.getElementById('signup-form').classList.add('hidden');
-            document.getElementById('login-form').classList.remove('hidden');
-        }
-
-        // Handle signup
-        async function handleSignup() {
-            const username = document.getElementById('signup-username').value.trim();
-            const password = document.getElementById('signup-password').value;
-            const workAddress = document.getElementById('signup-work-address').value.trim();
-            const hourlyRate = parseFloat(document.getElementById('signup-hourly-rate').value);
-
-            if (!username || !password || !workAddress || !hourlyRate) {
-                alert('Please fill all fields.');
-                return;
-            }
-
-            try {
-                // Create user with email (username@timetracker.app) and password
-                const email = `${username}@timetracker.app`;
-                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                const userId = userCredential.user.uid;
-
-                // Geocode work address
-                const result = await new Promise((resolve, reject) => {
-                    geocoder.geocode({ address: workAddress }, (results, status) => {
-                        if (status === 'OK') resolve(results[0].geometry.location);
-                        else reject(status);
-                    });
-                });
-
-                // Save user profile
-                await db.collection('trackerUsers').doc(userId).set({
-                    username,
-                    workAddress,
-                    workLocation: { lat: result.lat(), lng: result.lng() },
-                    hourlyRate,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                currentUserId = userId;
-                workLocation = { lat: result.lat(), lng: result.lng() };
-                showTrackerSection(username, workAddress, hourlyRate);
-                document.getElementById('status').innerHTML = `Profile created for ${username}`;
-            } catch (error) {
-                alert('Error creating profile: ' + error.message);
-            }
-        }
-
-        // Handle login
-        async function handleLoginAuth() {
-            const username = document.getElementById('login-username').value.trim();
-            const password = document.getElementById('login-password').value;
-
-            if (!username || !password) {
-                alert('Please fill all fields.');
-                return;
-            }
-
-            try {
-                const email = `${username}@timetracker.app`;
-                const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                const userId = userCredential.user.uid;
-
-                // Load user profile
-                const doc = await db.collection('trackerUsers').doc(userId).get();
-                if (doc.exists) {
-                    const data = doc.data();
-                    currentUserId = userId;
-                    workLocation = data.workLocation;
-                    showTrackerSection(data.username, data.workAddress, data.hourlyRate);
-                    document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
-                } else {
-                    alert('Profile not found.');
-                    await auth.signOut();
+            // Request notification permission
+            Notification.requestPermission().then(permission => {
+                if (permission !== 'granted') {
+                    alert('Please enable notifications for login/logout prompts.');
                 }
-            } catch (error) {
-                alert('Error logging in: ' + error.message);
-            }
-        }
+            });
 
-        // Handle sign out
-        async function handleSignOut() {
-            try {
-                await auth.signOut();
-                currentUserId = '';
-                isLoggedIn = false;
-                document.getElementById('tracker-section').classList.add('hidden');
-                document.getElementById('auth-section').classList.remove('hidden');
-                document.getElementById('status').innerHTML = 'Signed out successfully.';
-            } catch (error) {
-                alert('Error signing out: ' + error);
-            }
-        }
+            // Toggle between signup and login forms
+            window.showSignup = function() {
+                document.getElementById('login-form').value = '';
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('signup-form').classList.remove('hidden');
+            };
 
-        // Show tracker section
-        function showTrackerSection(username, workAddress, hourlyRate) {
-            document.getElementById('auth-section').classList.add('hidden');
-            document.getElementById('tracker-section').classList.remove('hidden');
-            document.getElementById('display-username').textContent = username;
-            document.getElementById('display-work-address').textContent = workAddress;
-            document.getElementById('hourly-rate').value = hourlyRate;
-        }
+            window.showLogin = function() {
+                document.getElementById('signup-form').value = '';
+                document.getElementById('signup-form').classList.add('hidden');
+                document.getElementById('login-form').classList.remove('hidden');
+            };
 
-        // Update hourly rate
-        async function updateHourlyRate() {
-            const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
-            if (!hourlyRate) {
-                alert('Please enter a valid hourly rate.');
-                return;
-            }
-            try {
-                await db.collection('trackerUsers').doc(currentUserId).update({
-                    hourlyRate,
-                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                document.getElementById('status').innerHTML = `Hourly rate updated to $${hourlyRate}`;
-            } catch (error) {
-                alert('Error updating hourly rate: ' + error);
-            }
-        }
+            // Handle signup
+            window.handleSignup = async function() {
+                const username = document.getElementById('signup-username').value.trim();
+                const password = document.getElementById('signup-password').value;
+                const workAddress = document.getElementById('signup-work-address').value.trim();
+                const hourlyRate = parseFloat(document.getElementById('signup-hourly-rate').value);
 
-        // Check location
-        function checkLocation() {
-            navigator.geolocation.watchPosition(position => {
-                const userLat = position.coords.latitude;
-                const userLng = position.coords.longitude;
-                const distance = getDistance(userLat, userLng, workLocation.lat, workLocation.lng);
-                
-                if (distance <= geofenceRadius && !isLoggedIn && currentUserId) {
-                    new Notification('Time to log in!', {
-                        body: 'You have arrived at your work location.'
-                    });
-                    document.getElementById('status').innerHTML = 'Please log in to start tracking time.';
+                if (!username || username.length < 3) {
+                    alert('Username must be at least 3 characters long.');
+                    return;
                 }
-            }, error => {
-                console.error('Geolocation error:', error);
-                document.getElementById('status').innerHTML = 'Unable to access location. Please log in manually.';
-            }, { enableHighAccuracy: true });
-        }
+                if (!password || password.length < 6) {
+                    alert('Password must be at least 6 characters long.');
+                    return;
+                }
+                if (!workAddress) {
+                    alert('Please enter a valid work address (e.g., 123 Main St, Los Angeles, CA).');
+                    return;
+                }
+                if (!hourlyRate || hourlyRate <= 0) {
+                    alert('Please enter a valid hourly rate greater than 0.');
+                    return;
+                }
 
-        // Calculate distance in meters
-        function getDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3;
-            const φ1 = lat1 * Math.PI / 180;
-            const φ2 = lat2 * Math.PI / 180;
-            const Δφ = (lat2 - lat1) * Math.PI / 180;
-            const Δλ = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            return R * c;
-        }
-
-        // Handle login (time tracking)
-        async function handleLogin() {
-            if (isLoggedIn) {
-                alert('Already logged in!');
-                return;
-            }
-            const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
-            if (!hourlyRate) {
-                alert('Please enter an hourly rate.');
-                return;
-            }
-
-            loginTime = new Date();
-            isLoggedIn = true;
-            document.getElementById('login-btn').disabled = true;
-            document.getElementById('logout-btn').disabled = false;
-            document.getElementById('status').innerHTML = `Logged in at ${loginTime.toLocaleString()}`;
-
-            await db.collection('trackerTimeEntries').add({
-                type: 'login',
-                userId: currentUserId,
-                timestamp: firebase.firestore.Timestamp.fromDate(loginTime),
-                hourlyRate,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-        }
-
-        // Handle logout (time tracking)
-        async function handleLogout() {
-            if (!isLoggedIn) {
-                alert('Not logged in!');
-                return;
-            }
-            const logoutTime = new Date();
-            const hoursWorked = (logoutTime - loginTime) / (1000 * 60 * 60);
-            isLoggedIn = false;
-            document.getElementById('login-btn').disabled = false;
-            document.getElementById('logout-btn').disabled = true;
-            document.getElementById('status').innerHTML = `Logged out at ${logoutTime.toLocaleString()}. Hours worked: ${hoursWorked.toFixed(2)}`;
-
-            await db.collection('trackerTimeEntries').add({
-                type: 'logout',
-                userId: currentUserId,
-                timestamp: firebase.firestore.Timestamp.fromDate(logoutTime),
-                hoursWorked,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            new Notification('Time to log out!', {
-                body: 'Your work shift has ended.'
-            });
-        }
-
-        // Generate payment report
-        async function generateReport() {
-            if (!currentUserId) {
-                alert('Please log in first.');
-                return;
-            }
-            const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
-            if (!hourlyRate) {
-                alert('Please enter an hourly rate.');
-                return;
-            }
-
-            try {
-                const entries = await db.collection('trackerTimeEntries')
-                    .where('type', '==', 'logout')
-                    .where('userId', '==', currentUserId)
-                    .orderBy('createdAt', 'desc')
-                    .get();
-
-                let totalHours = 0;
-                entries.forEach(doc => {
-                    totalHours += doc.data().hoursWorked || 0;
-                });
-
-                const totalPay = totalHours * hourlyRate;
-                const username = document.getElementById('display-username').textContent;
-                document.getElementById('report').innerHTML = `
-                    <h3>Payment Report for ${username}</h3>
-                    <p>Total Hours: ${totalHours.toFixed(2)}</p>
-                    <p>Total Pay: $${totalPay.toFixed(2)}</p>
-                    <button onclick="downloadReport(${totalHours}, ${totalPay}, '${username}')">Download PDF</button>
-                    <button onclick="resetHours()">Reset Hours</button>
-                `;
-            } catch (error) {
-                alert('Error generating report: ' + error);
-            }
-        }
-
-        // Download PDF report
-        function downloadReport(totalHours, totalPay, username) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            doc.text(`Payment Report for ${username}`, 10, 10);
-            doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 10, 20);
-            doc.text(`Total Pay: $${totalPay.toFixed(2)}`, 10, 30);
-            doc.save(`payment_report_${username}.pdf`);
-        }
-
-        // Reset hours
-        async function resetHours() {
-            if (!currentUserId) {
-                alert('Please log in first.');
-                return;
-            }
-            if (confirm('Are you sure you want to reset all hours after payment?')) {
                 try {
-                    const batch = db.batch();
-                    const entries = await db.collection('trackerTimeEntries')
-                        .where('userId', '==', currentUserId)
-                        .get();
-                    entries.forEach(doc => {
-                        batch.delete(doc.ref);
-                    });
-                    await batch.commit();
-                    document.getElementById('report').innerHTML = 'Hours reset successfully.';
-                } catch (error) {
-                    alert('Error resetting hours: ' + error);
-                }
-            }
-        }
+                    // Create user with email (username@timetracker.app)
+                    const email = `${username.toLowerCase()}@timetracker.app`;
+                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                    const userId = userCredential.user.uid;
 
-        // Initialize
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                // User is logged in
-                db.collection('trackerUsers').doc(user.uid).get().then(doc => {
+                    // Geocode work address
+                    const result = await new Promise((resolve, reject) => {
+                        geocoder.geocode({ address: workAddress }, (results, status) => {
+                            if (status === 'OK') resolve(results[0].geometry.location);
+                            else reject(`Geocoding failed: ${status}`);
+                        });
+                    });
+
+                    // Save user profile
+                    await db.collection('trackerUsers').doc(userId).set({
+                        username,
+                        workAddress,
+                        workLocation: { lat: result.lat(), lng: result.lng() },
+                        hourlyRate,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    currentUserId = userId;
+                    workLocation = { lat: result.lat(), lng: result.lng() };
+                    showTrackerSection(username, workAddress, hourlyRate);
+                    document.getElementById('status').innerHTML = `Profile created for ${username}. Welcome!`;
+                } catch (error) {
+                    alert(`Error creating profile: ${error.message}`);
+                }
+            };
+
+            // Handle login
+            window.handleLogin = async function() {
+                const username = document.getElementById('login-username').value.trim();
+                const password = document.getElementById('login-password').value;
+
+                if (!username || !password) {
+                    alert('Please enter both username and password.');
+                    return;
+                }
+
+                try {
+                    const email = `${username.toLowerCase()}@timetracker.app`;
+                    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                    const userId = userCredential.user.uid;
+
+                    // Load user profile
+                    const doc = await db.collection('trackerUsers').doc(userId).get();
                     if (doc.exists) {
                         const data = doc.data();
-                        currentUserId = user.uid;
+                        currentUserId = userId;
                         workLocation = data.workLocation;
                         showTrackerSection(data.username, data.workAddress, data.hourlyRate);
                         document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
-                        checkLocation();
+                    } else {
+                        alert('Profile not found. Please sign up.');
+                        await auth.signOut();
                     }
-                }).catch(error => {
-                    console.error('Error loading profile:', error);
-                });
-            } else {
-                // No user logged in
-                document.getElementById('auth-section').classList.remove('hidden');
-                document.getElementById('tracker-section').classList.add('hidden');
+                } catch (error) {
+                    alert(`Error logging in: ${error.message}`);
+                }
+            };
+
+            // Handle sign out
+            window.handleSignOut = async function() {
+                try {
+                    await auth.signOut();
+                    currentUserId = '';
+                    isLoggedIn = false;
+                    document.getElementById('tracker-section').classList.add('hidden');
+                    document.getElementById('auth-section').classList.remove('hidden');
+                    document.getElementById('status').innerHTML = 'Signed out successfully.';
+                } catch (error) {
+                    alert(`Error signing out: ${error.message}`);
+                }
+            };
+
+            // Show tracker section
+            function showTrackerSection(username, workAddress, hourlyRate) {
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('tracker-section').classList.remove('hidden');
+                document.getElementById('display-username').textContent = username;
+                document.getElementById('display-work-address').textContent = workAddress;
+                document.getElementById('hourly-rate').value = hourlyRate;
             }
+
+            // Update hourly rate
+            window.updateHourlyRate = async function() {
+                const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
+                if (!hourlyRate || hourlyRate <= 0) {
+                    alert('Please enter a valid hourly rate greater than 0.');
+                    return;
+                }
+                try {
+                    await db.collection('trackerUsers').doc(currentUserId).update({
+                        hourlyRate,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    document.getElementById('status').innerHTML = `Hourly rate updated to $${hourlyRate}`;
+                } catch (error) {
+                    alert(`Error updating hourly rate: ${error.message}`);
+                }
+            };
+
+            // Check location
+            function checkLocation() {
+                navigator.geolocation.watchPosition(position => {
+                    const userLat = position.coords.latitude;
+                    const userLng = position.coords.longitude;
+                    const distance = getDistance(userLat, userLng, workLocation.lat, workLocation.lng);
+                    
+                    if (distance <= geofenceRadius && !isLoggedIn && currentUserId) {
+                        new Notification('Time to log in!', {
+                            body: 'You have arrived at your work location.'
+                        });
+                        document.getElementById('status').innerHTML = 'Please log in to start tracking time.';
+                    }
+                }, error => {
+                    console.error('Geolocation error:', error);
+                    document.getElementById('status').innerHTML = 'Unable to access location. Please log in manually.';
+                }, { enableHighAccuracy: true });
+            }
+
+            // Calculate distance in meters
+            function getDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371e3;
+                const φ1 = lat1 * Math.PI / 180;
+                const φ2 = lat2 * Math.PI / 180;
+                const Δφ = (lat2 - lat1) * Math.PI / 180;
+                const Δλ = (lon2 - lon1) * Math.PI / 180;
+                const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                          Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                return R * c;
+            }
+
+            // Handle time login
+            window.handleTimeLogin = async function() {
+                if (isLoggedIn) {
+                    alert('Already logged in!');
+                    return;
+                }
+                const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
+                if (!hourlyRate || hourlyRate <= 0) {
+                    alert('Please enter a valid hourly rate.');
+                    return;
+                }
+
+                loginTime = new Date();
+                isLoggedIn = true;
+                document.getElementById('login-btn').disabled = true;
+                document.getElementById('logout-btn').disabled = false;
+                document.getElementById('status').innerHTML = `Logged in at ${loginTime.toLocaleString()}`;
+
+                await db.collection('trackerTimeEntries').add({
+                    type: 'login',
+                    userId: currentUserId,
+                    timestamp: firebase.firestore.Timestamp.fromDate(loginTime),
+                    hourlyRate,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            };
+
+            // Handle time logout
+            window.handleTimeLogout = async function() {
+                if (!isLoggedIn) {
+                    alert('Not logged in!');
+                    return;
+                }
+                const logoutTime = new Date();
+                const hoursWorked = (logoutTime - loginTime) / (1000 * 60 * 60);
+                isLoggedIn = false;
+                document.getElementById('login-btn').disabled = false;
+                document.getElementById('logout-btn').disabled = true;
+                document.getElementById('status').innerHTML = `Logged out at ${logoutTime.toLocaleString()}. Hours worked: ${hoursWorked.toFixed(2)}`;
+
+                await db.collection('trackerTimeEntries').add({
+                    type: 'logout',
+                    userId: currentUserId,
+                    timestamp: firebase.firestore.Timestamp.fromDate(logoutTime),
+                    hoursWorked,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                new Notification('Time to log out!', {
+                    body: 'Your work shift has ended.'
+                });
+            };
+
+            // Generate payment report
+            window.generateReport = async function() {
+                if (!currentUserId) {
+                    alert('Please log in first.');
+                    return;
+                }
+                const hourlyRate = parseFloat(document.getElementById('hourly-rate').value);
+                if (!hourlyRate || hourlyRate <= 0) {
+                    alert('Please enter a valid hourly rate.');
+                    return;
+                }
+
+                try {
+                    const entries = await db.collection('trackerTimeEntries')
+                        .where('type', '==', 'logout')
+                        .where('userId', '==', currentUserId)
+                        .orderBy('createdAt', 'desc')
+                        .get();
+
+                    let totalHours = 0;
+                    entries.forEach(doc => {
+                        totalHours += doc.data().hoursWorked || 0;
+                    });
+
+                    const totalPay = totalHours * hourlyRate;
+                    const username = document.getElementById('display-username').textContent;
+                    document.getElementById('report').innerHTML = `
+                        <h3>Payment Report for ${username}</h3>
+                        <p>Total Hours: ${totalHours.toFixed(2)}</p>
+                        <p>Total Pay: $${totalPay.toFixed(2)}</p>
+                        <button onclick="downloadReport(${totalHours}, ${totalPay}, '${username}')">Download PDF</button>
+                        <button onclick="resetHours()">Reset Hours</button>
+                    `;
+                } catch (error) {
+                    alert(`Error generating report: ${error.message}`);
+                }
+            };
+
+            // Download PDF report
+            window.downloadReport = function(totalHours, totalPay, username) {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                doc.text(`Payment Report for ${username}`, 10, 10);
+                doc.text(`Total Hours: ${totalHours.toFixed(2)}`, 10, 20);
+                doc.text(`Total Pay: $${totalPay.toFixed(2)}`, 10, 30);
+                doc.save(`payment_report_${username}.pdf`);
+            };
+
+            // Reset hours
+            window.resetHours = async function() {
+                if (!currentUserId) {
+                    alert('Please log in first.');
+                    return;
+                }
+                if (confirm('Are you sure you want to reset all hours after payment?')) {
+                    try {
+                        const batch = db.batch();
+                        const entries = await db.collection('trackerTimeEntries')
+                            .where('userId', '==', currentUserId)
+                            .get();
+                        entries.forEach(doc => {
+                            batch.delete(doc.ref);
+                        });
+                        await batch.commit();
+                        document.getElementById('report').innerHTML = 'Hours reset successfully.';
+                    } catch (error) {
+                        alert(`Error resetting hours: ${error.message}`);
+                    }
+                }
+            };
+
+            // Auth state listener
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    db.collection('trackerUsers').doc(user.uid).get().then(doc => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            currentUserId = user.uid;
+                            workLocation = data.workLocation;
+                            showTrackerSection(data.username, data.workAddress, data.hourlyRate);
+                            document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
+                            checkLocation();
+                        }
+                    }).catch(error => {
+                        console.error('Error loading profile:', error);
+                        document.getElementById('status').innerHTML = `Error loading profile: ${error.message}`;
+                    });
+                } else {
+                    document.getElementById('auth-section').classList.remove('hidden');
+                    document.getElementById('tracker-section').classList.add('hidden');
+                }
+            });
         });
     </script>
 </body>
