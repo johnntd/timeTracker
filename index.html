@@ -111,11 +111,11 @@
             }
         }
     </style>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAhuG4Bg-PBtG2JdnrZYj6ZLb2HXG1RNF4&libraries=places"></script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAhuG4Bg-PBtG2JdnrZYj6ZLb2HXG1RNF4&libraries=places&callback=initGeocoder"></script>
 </head>
 <body>
     <header>
@@ -134,8 +134,8 @@
                     <label for="login-password">Password</label>
                     <input type="password" id="login-password" placeholder="Enter password" required>
                 </div>
-                <button onclick="handleLogin()">Login</button>
-                <button onclick="showSignup()">Sign Up</button>
+                <button id="login-btn-auth">Login</button>
+                <button id="signup-btn">Sign Up</button>
             </div>
             <div id="signup-form" class="hidden">
                 <div class="form-group">
@@ -154,8 +154,8 @@
                     <label for="signup-hourly-rate">Hourly Rate ($)</label>
                     <input type="number" id="signup-hourly-rate" step="0.01" placeholder="Enter hourly rate" required>
                 </div>
-                <button onclick="handleSignup()">Create Profile</button>
-                <button onclick="showLogin()">Back to Login</button>
+                <button id="create-profile-btn">Create Profile</button>
+                <button id="back-to-login-btn">Back to Login</button>
             </div>
         </section>
 
@@ -172,12 +172,12 @@
             <div class="form-group">
                 <label for="hourly-rate">Hourly Rate ($):</label>
                 <input type="number" id="hourly-rate" step="0.01" required>
-                <button onclick="updateHourlyRate()">Update Hourly Rate</button>
+                <button id="update-rate-btn">Update Hourly Rate</button>
             </div>
-            <button id="login-btn" onclick="handleTimeLogin()">Log In</button>
-            <button id="logout-btn" onclick="handleTimeLogout()" disabled>Log Out</button>
-            <button id="report-btn" onclick="generateReport()">Generate Payment Report</button>
-            <button onclick="handleSignOut()">Sign Out</button>
+            <button id="login-btn">Log In</button>
+            <button id="logout-btn" disabled>Log Out</button>
+            <button id="report-btn">Generate Payment Report</button>
+            <button id="signout-btn">Sign Out</button>
             <div id="status"></div>
             <div id="report"></div>
         </section>
@@ -188,6 +188,11 @@
     </footer>
 
     <script>
+        let geocoder;
+        function initGeocoder() {
+            geocoder = new google.maps.Geocoder();
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             // Firebase configuration
             const firebaseConfig = {
@@ -209,9 +214,6 @@
             let loginTime = null;
             let currentUserId = '';
 
-            // Initialize Google Maps Geocoder
-            const geocoder = new google.maps.Geocoder();
-
             // Request notification permission
             Notification.requestPermission().then(permission => {
                 if (permission !== 'granted') {
@@ -221,15 +223,19 @@
 
             // Toggle between signup and login forms
             window.showSignup = function() {
-                document.getElementById('login-form').value = '';
                 document.getElementById('login-form').classList.add('hidden');
                 document.getElementById('signup-form').classList.remove('hidden');
+                document.getElementById('login-username').value = '';
+                document.getElementById('login-password').value = '';
             };
 
             window.showLogin = function() {
-                document.getElementById('signup-form').value = '';
                 document.getElementById('signup-form').classList.add('hidden');
                 document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('signup-username').value = '';
+                document.getElementById('signup-password').value = '';
+                document.getElementById('signup-work-address').value = '';
+                document.getElementById('signup-hourly-rate').value = '';
             };
 
             // Handle signup
@@ -517,27 +523,16 @@
                 }
             };
 
-            // Auth state listener
-            auth.onAuthStateChanged(user => {
-                if (user) {
-                    db.collection('trackerUsers').doc(user.uid).get().then(doc => {
-                        if (doc.exists) {
-                            const data = doc.data();
-                            currentUserId = user.uid;
-                            workLocation = data.workLocation;
-                            showTrackerSection(data.username, data.workAddress, data.hourlyRate);
-                            document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
-                            checkLocation();
-                        }
-                    }).catch(error => {
-                        console.error('Error loading profile:', error);
-                        document.getElementById('status').innerHTML = `Error loading profile: ${error.message}`;
-                    });
-                } else {
-                    document.getElementById('auth-section').classList.remove('hidden');
-                    document.getElementById('tracker-section').classList.add('hidden');
-                }
-            });
+            // Event listeners
+            document.getElementById('login-btn-auth').addEventListener('click', handleLogin);
+            document.getElementById('signup-btn').addEventListener('click', showSignup);
+            document.getElementById('create-profile-btn').addEventListener('click', handleSignup);
+            document.getElementById('back-to-login-btn').addEventListener('click', showLogin);
+            document.getElementById('login-btn').addEventListener('click', handleTimeLogin);
+            document.getElementById('logout-btn').addEventListener('click', handleTimeLogout);
+            document.getElementById('report-btn').addEventListener('click', generateReport);
+            document.getElementById('update-rate-btn').addEventListener('click', updateHourlyRate);
+            document.getElementById('signout-btn').addEventListener('click', handleSignOut);
         });
     </script>
 </body>
