@@ -454,7 +454,7 @@
                     for (let attempt = 1; attempt <= maxRetries; attempt++) {
                         try {
                             const email = `${username.toLowerCase()}@timetracker.app`;
-                            console.log('Attempting login with email:', email); // Debug log
+                            console.log(`Attempting login with email: ${email}, attempt ${attempt}`); // Debug log
                             const userCredential = await auth.signInWithEmailAndPassword(email, password);
                             const userId = userCredential.user.uid;
 
@@ -494,10 +494,13 @@
                         }
                     }
 
-                    // Fallback if login button click doesn't respond
-                    console.log('Login attempt failed, resetting form visibility');
+                    // Fallback if login fails
+                    console.log('Login attempt failed after retries, resetting form visibility');
                     document.getElementById('auth-section').classList.remove('hidden');
                     document.getElementById('tracker-section').classList.add('hidden');
+                    document.getElementById('login-username').value = '';
+                    document.getElementById('login-password').value = '';
+                    document.getElementById('status').innerHTML = 'Login failed. Please try again.';
                 };
 
                 // Handle sign out
@@ -516,6 +519,8 @@
                         document.getElementById('tracker-section').classList.add('hidden');
                         document.getElementById('auth-section').classList.remove('hidden');
                         document.getElementById('status').innerHTML = 'Signed out successfully.';
+                        document.getElementById('login-username').value = '';
+                        document.getElementById('login-password').value = '';
                     } catch (error) {
                         console.error('Sign out error:', error);
                         alert(`Sign out failed: ${error.message}`);
@@ -720,7 +725,11 @@
                             document.getElementById('auth-section').classList.remove('hidden');
                             document.getElementById('tracker-section').classList.add('hidden');
                             document.getElementById('status').innerHTML = 'Please log in.';
+                            document.getElementById('login-username').value = '';
+                            document.getElementById('login-password').value = '';
                         }
+                    } else {
+                        console.log('Auth state changed, no user or currentUserId set');
                     }
                 });
             } catch (error) {
