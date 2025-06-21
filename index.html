@@ -446,7 +446,10 @@
                     const username = document.getElementById('login-username')?.value.trim();
                     const password = document.getElementById('login-password')?.value;
 
-                    if (!username || !password) return alert('Please enter username and password.');
+                    if (!username || !password) {
+                        alert('Please enter username and password.');
+                        return;
+                    }
 
                     for (let attempt = 1; attempt <= maxRetries; attempt++) {
                         try {
@@ -490,6 +493,11 @@
                             }
                         }
                     }
+
+                    // Fallback if login button click doesn't respond
+                    console.log('Login attempt failed, resetting form visibility');
+                    document.getElementById('auth-section').classList.remove('hidden');
+                    document.getElementById('tracker-section').classList.add('hidden');
                 };
 
                 // Handle sign out
@@ -707,8 +715,12 @@
                             }).catch(error => console.error('Profile load error:', error));
                         }
                     } else if (!user) {
-                        document.getElementById('auth-section').classList.remove('hidden');
-                        document.getElementById('tracker-section').classList.add('hidden');
+                        if (currentUserId) {
+                            console.log('Auth state changed to null, resetting UI');
+                            document.getElementById('auth-section').classList.remove('hidden');
+                            document.getElementById('tracker-section').classList.add('hidden');
+                            document.getElementById('status').innerHTML = 'Please log in.';
+                        }
                     }
                 });
             } catch (error) {
