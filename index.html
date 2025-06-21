@@ -591,7 +591,13 @@
                             type: 'logout', userId: currentUserId, timestamp: firebase.firestore.Timestamp.fromDate(logoutTime),
                             hoursWorked, createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
-                        new Notification('Shift Ended', { body: 'Your shift has ended.' });
+
+                        // Check for Notification support before creating
+                        if ('Notification' in window && Notification.permission === 'granted') {
+                            new Notification('Shift Ended', { body: 'Your shift has ended.' });
+                        } else {
+                            document.getElementById('status').innerHTML += ' (Notification not supported or permission denied.)';
+                        }
                     } catch (error) {
                         console.error('Time logout error:', error);
                         alert(`Logout failed: ${error.message}`);
