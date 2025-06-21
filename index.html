@@ -600,8 +600,8 @@
                             hoursWorked, createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
 
-                        // Check for Notification support and permission
-                        if ('Notification' in window && Notification.permission === 'granted') {
+                        // Enhanced notification check
+                        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                             new Notification('Shift Ended', { body: 'Your shift has ended.' });
                         } else if (Notification.permission === 'default') {
                             document.getElementById('status').innerHTML += ' (Please enable notifications in settings for alerts.)';
@@ -610,7 +610,11 @@
                         }
                     } catch (error) {
                         console.error('Time logout error:', error);
-                        alert(`Logout failed: ${error.message}`);
+                        if (error.message.includes('Notification')) {
+                            document.getElementById('status').innerHTML += ' (Notification failed; check browser support.)';
+                        } else {
+                            alert(`Logout failed: ${error.message}`);
+                        }
                     }
                 };
 
