@@ -458,17 +458,12 @@
                             const userCredential = await auth.signInWithEmailAndPassword(email, password);
                             const userId = userCredential.user.uid;
 
-                            // Check and update active session
+                            // Simplify session management for testing
                             const sessionRef = db.collection('activeSessions').doc(userId);
-                            const sessionDoc = await sessionRef.get();
-                            if (sessionDoc.exists) {
-                                await auth.signOut(); // Logout previous session
-                                console.log(`Logged out previous session for userId: ${userId}`);
-                            }
                             await sessionRef.set({
                                 lastActive: firebase.firestore.FieldValue.serverTimestamp(),
                                 userId
-                            });
+                            }, { merge: true });
 
                             const doc = await db.collection('trackerUsers').doc(userId).get();
                             if (doc.exists) {
@@ -487,7 +482,7 @@
                         } catch (error) {
                             console.error(`Login attempt ${attempt} error:`, error.code, error.message);
                             if (attempt === maxRetries) {
-                                alert(`Login failed: ${error.message} (Code: ${error.code}). Check credentials or internet.`);
+                                alert(`Login failed: ${error.message} (Code: ${error.code}). Check credentials, internet, or contact support.`);
                             } else {
                                 await new Promise(resolve => setTimeout(resolve, delay));
                             }
@@ -500,7 +495,7 @@
                     document.getElementById('tracker-section').classList.add('hidden');
                     document.getElementById('login-username').value = '';
                     document.getElementById('login-password').value = '';
-                    document.getElementById('status').innerHTML = 'Login failed. Please try again.';
+                    document.getElementById('status').innerHTML = 'Login failed. Please try again or verify credentials.';
                 };
 
                 // Handle sign out
@@ -511,7 +506,17 @@
                             geolocationWatcher = null;
                         }
                         if (currentUserId) {
-                            await db.collection('activeSessions').doc(currentUserId).delete();
+                            const sessionRef = db.collection('activeSessions').doc(currentUserId);
+                            try {
+                                await sessionRef.delete();
+                                console.log(`Session deleted for userId: ${currentUserId}`);
+                            } catch (sessionError) {
+                                if (sessionError.code === 'permission-denied') {
+                                    console.warn('Permission denied to delete session, proceeding with sign-out:', sessionError);
+                                } else {
+                                    throw sessionError;
+                                }
+                            }
                         }
                         await auth.signOut();
                         currentUserId = '';
@@ -522,8 +527,8 @@
                         document.getElementById('login-username').value = '';
                         document.getElementById('login-password').value = '';
                     } catch (error) {
-                        console.error('Sign out error:', error);
-                        alert(`Sign out failed: ${error.message}`);
+                        console.error('Sign out error:', error.code, error.message);
+                        alert(`Sign out failed: ${error.message} (Code: ${error.code}). Please try again or refresh.`);
                     }
                 };
 
