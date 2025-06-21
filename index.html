@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Time Tracker</title>
     <style>
         * {
@@ -26,22 +26,23 @@
             text-align: center;
         }
         header h1 {
-            font-size: 2em;
+            font-size: 1.8em;
         }
         main {
-            max-width: 600px;
-            margin: 2em auto;
-            padding: 2em;
+            flex: 1;
+            max-width: 100%;
+            margin: 1em;
+            padding: 1em;
             background: #fff;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
         .section {
-            margin-bottom: 2em;
+            margin-bottom: 1.5em;
         }
         .section h2 {
-            font-size: 1.5em;
-            margin-bottom: 1em;
+            font-size: 1.3em;
+            margin-bottom: 0.8em;
             color: #00695c;
         }
         .form-group {
@@ -49,22 +50,29 @@
         }
         label {
             display: block;
-            margin-bottom: 0.5em;
+            margin-bottom: 0.4em;
             font-weight: bold;
+            font-size: 1em;
         }
         input, button {
             width: 100%;
-            padding: 0.5em;
+            padding: 0.6em;
             border: 1px solid #ccc;
-            border-radius: 4px;
+            border-radius: 6px;
             font-size: 1em;
+            box-sizing: border-box;
+            min-height: 2.5em;
         }
         button {
             background: #00695c;
             color: white;
             border: none;
             cursor: pointer;
-            margin-top: 0.5em;
+            margin-top: 0.6em;
+            padding: 0.7em;
+            font-size: 1.1em;
+            border-radius: 6px;
+            transition: background 0.3s;
         }
         button:hover {
             background: #00897b;
@@ -73,7 +81,8 @@
             margin-top: 1em;
             padding: 1em;
             background: #f9f9f9;
-            border-radius: 4px;
+            border-radius: 6px;
+            font-size: 1em;
         }
         .hidden {
             display: none;
@@ -90,8 +99,19 @@
                 font-size: 1.5em;
             }
             main {
-                margin: 1em;
-                padding: 1em;
+                margin: 0.5em;
+                padding: 0.8em;
+            }
+            .section h2 {
+                font-size: 1.2em;
+            }
+            input, button {
+                padding: 0.5em;
+                min-height: 2.2em;
+            }
+            button {
+                font-size: 1em;
+                padding: 0.6em;
             }
         }
     </style>
@@ -99,13 +119,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAhuG4Bg-PBtG2JdnrZYj6ZLb2HXG1RNF4&libraries=places&callback=initGeocoder"
-  async
-  defer
-  loading="async"
-></script>
-    
+    <!-- Google Maps API loaded dynamically -->
 </head>
 <body>
     <header>
@@ -180,495 +194,556 @@
 
     <script>
         let geocoder;
-        function initGeocoder() {
-            geocoder = new google.maps.Geocoder();
-        }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Firebase configuration
-            const firebaseConfig = {
-                apiKey: "AIzaSyCo1FzDthSCXINRHlyJkqdcVKq_inM71SQ",
-                authDomain: "dulichcali-booking-calendar.firebaseapp.com",
-                projectId: "dulichcali-booking-calendar",
-                storageBucket: "dulichcali-booking-calendar.appspot.com",
-                messagingSenderId: "623460884698",
-                appId: "1:623460884698:web:a08bd435c453a7b4db05e3"
-            };
-            firebase.initializeApp(firebaseConfig);
-            const auth = firebase.auth();
-            const db = firebase.firestore();
-
-            // Geolocation settings
-            let workLocation = { lat: 33.9416, lng: -118.4085 }; // Default: LAX
-            const geofenceRadius = 500; // meters
-            let isLoggedIn = false;
-            let loginTime = null;
-            let currentUserId = '';
-            let geolocationWatcher = null;
-
-            // Request notification permission
-            Notification.requestPermission().then(permission => {
-                if (permission !== 'granted') {
-                    document.getElementById('status').innerHTML = 'Notifications disabled. Login prompts may not appear.';
-                }
-            }).catch(error => {
-                console.error('Notification permission error:', error);
-            });
-
-            // Toggle between signup and login forms
-            const showSignup = () => {
-                const loginForm = document.getElementById('login-form');
-                const signupForm = document.getElementById('signup-form');
-                if (loginForm && signupForm) {
-                    loginForm.classList.add('hidden');
-                    signupForm.classList.remove('hidden');
-                    document.getElementById('login-username').value = '';
-                    document.getElementById('login-password').value = '';
-                } else {
-                    console.error('Login or signup form not found');
-                }
-            };
-
-            const showLogin = () => {
-                const signupForm = document.getElementById('signup-form');
-                const loginForm = document.getElementById('login-form');
-                if (signupForm && loginForm) {
-                    signupForm.classList.add('hidden');
-                    loginForm.classList.remove('hidden');
-                    document.getElementById('signup-username').value = '';
-                    document.getElementById('signup-password').value = '';
-                    document.getElementById('signup-work-address').value = '';
-                    document.getElementById('signup-hourly-rate').value = '';
-                } else {
-                    console.error('Signup or login form not found');
-                }
-            };
-
-            // Handle signup
-            const handleSignup = async () => {
-                const username = document.getElementById('signup-username')?.value.trim();
-                const password = document.getElementById('signup-password')?.value;
-                const workAddress = document.getElementById('signup-work-address')?.value.trim();
-                const hourlyRate = parseFloat(document.getElementById('signup-hourly-rate')?.value);
-
-                if (!username || username.length < 3) {
-                    alert('Username must be at least 3 characters long.');
-                    return;
-                }
-                if (!password || password.length < 6) {
-                    alert('Password must be at least 6 characters long.');
-                    return;
-                }
-                if (!workAddress) {
-                    alert('Please enter a valid work address (e.g., 123 Main St, Los Angeles, CA).');
-                    return;
-                }
-                if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
-                    alert('Please enter a valid hourly rate greater than 0.');
+        function loadGoogleMapsAPI() {
+            return new Promise((resolve, reject) => {
+                if (window.google && window.google.maps && window.google.maps.Geocoder) {
+                    geocoder = new google.maps.Geocoder();
+                    console.log('Google Maps API already loaded with Geocoder');
+                    resolve();
                     return;
                 }
 
-                try {
-                    const user = auth.currentUser;
-                    if (user) await auth.signOut();
-
-                    const email = `${username.toLowerCase()}@timetracker.app`;
-                    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-                    const userId = userCredential.user.uid;
-
-                    const result = await new Promise((resolve, reject) => {
-                        geocoder.geocode({ address: workAddress }, (results, status) => {
-                            if (status === 'OK') resolve(results[0].geometry.location);
-                            else reject(`Geocoding failed: ${status}`);
-                        });
-                    });
-
-                    const lat = result.lat();
-                    const lng = result.lng();
-                    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-                        throw new Error('Invalid geolocation coordinates');
-                    }
-
-                    await db.collection('trackerUsers').doc(userId).set({
-                        username,
-                        workAddress,
-                        workLocation: { lat, lng },
-                        hourlyRate,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    console.log('Profile saved for userId:', userId);
-
-                    currentUserId = userId;
-                    workLocation = { lat, lng };
-                    showTrackerSection(username, workAddress, hourlyRate);
-                    document.getElementById('status').innerHTML = `Profile created for ${username}. Welcome!`;
-                } catch (error) {
-                    console.error('Signup error:', error);
-                    alert(`Error creating profile: ${error.message}`);
-                }
-            };
-
-            // Handle login
-            const handleLogin = async () => {
-                const username = document.getElementById('login-username')?.value.trim();
-                const password = document.getElementById('login-password')?.value;
-
-                if (!username || !password) {
-                    alert('Please enter both username and password.');
-                    return;
-                }
-
-                try {
-                    const email = `${username.toLowerCase()}@timetracker.app`;
-                    const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                    const userId = userCredential.user.uid;
-
-                    const doc = await db.collection('trackerUsers').doc(userId).get();
-                    if (doc.exists) {
-                        const data = doc.data();
-                        currentUserId = userId;
-                        workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
-                        showTrackerSection(data.username, data.workAddress, data.hourlyRate);
-                        document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAhuG4Bg-PBtG2JdnrZYj6ZLb2HXG1RNF4&libraries=places&loading=async`;
+                script.async = true;
+                script.onload = () => {
+                    if (window.google && window.google.maps && typeof google.maps.Geocoder === 'function') {
+                        geocoder = new google.maps.Geocoder();
+                        console.log('Google Maps API loaded successfully with Geocoder');
+                        resolve();
                     } else {
-                        alert('Profile not found. Please sign up.');
-                        await auth.signOut();
+                        reject(new Error('Google Maps API loaded but Geocoder not available as a constructor'));
                     }
-                } catch (error) {
-                    console.error('Login error:', error);
-                    alert(`Error logging in: ${error.message}`);
-                }
-            };
-
-            // Handle sign out
-            const handleSignOut = async () => {
-                try {
-                    if (geolocationWatcher) {
-                        navigator.geolocation.clearWatch(geolocationWatcher);
-                        geolocationWatcher = null;
-                    }
-                    await auth.signOut();
-                    currentUserId = '';
-                    isLoggedIn = false;
-                    document.getElementById('tracker-section').classList.add('hidden');
-                    document.getElementById('auth-section').classList.remove('hidden');
-                    document.getElementById('status').innerHTML = 'Signed out successfully.';
-                } catch (error) {
-                    console.error('Sign out error:', error);
-                    alert(`Error signing out: ${error.message}`);
-                }
-            };
-
-            // Show tracker section
-            function showTrackerSection(username, workAddress, hourlyRate) {
-                const authSection = document.getElementById('auth-section');
-                const trackerSection = document.getElementById('tracker-section');
-                if (authSection && trackerSection) {
-                    authSection.classList.add('hidden');
-                    trackerSection.classList.remove('hidden');
-                    document.getElementById('display-username').textContent = username;
-                    document.getElementById('display-work-address').textContent = workAddress;
-                    document.getElementById('hourly-rate').value = hourlyRate || 0;
-                } else {
-                    console.error('Tracker section or auth section not found');
-                }
-            }
-
-            // Update hourly rate
-            const updateHourlyRate = async () => {
-                const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
-                if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
-                    alert('Please enter a valid hourly rate greater than 0.');
-                    return;
-                }
-                try {
-                    await db.collection('trackerUsers').doc(currentUserId).update({
-                        hourlyRate,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    console.log('Hourly rate updated:', hourlyRate);
-                    document.getElementById('status').innerHTML = `Hourly rate updated to $${hourlyRate}`;
-                } catch (error) {
-                    console.error('Update hourly rate error:', error);
-                    alert(`Error updating hourly rate: ${error.message}`);
-                }
-            };
-
-            // Check location periodically
-            function checkLocation() {
-                if (geolocationWatcher) {
-                    navigator.geolocation.clearWatch(geolocationWatcher);
-                }
-                geolocationWatcher = navigator.geolocation.watchPosition(
-                    position => {
-                        const userLat = position.coords.latitude;
-                        const userLng = position.coords.longitude;
-                        const distance = getDistance(userLat, userLng, workLocation.lat, workLocation.lng);
-                        if (distance <= geofenceRadius && !isLoggedIn && currentUserId) {
-                            new Notification('Time to log in!', {
-                                body: 'You have arrived at your work location.'
-                            });
-                            document.getElementById('status').innerHTML = 'Please log in to start tracking time.';
-                        }
-                    },
-                    error => {
-                        console.error('Geolocation error:', error);
-                        document.getElementById('status').innerHTML = 'Unable to access location. Please log in manually.';
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-                );
-            }
-
-            // Calculate distance in meters
-            function getDistance(lat1, lon1, lat2, lon2) {
-                const R = 6371e3;
-                const φ1 = lat1 * Math.PI / 180;
-                const φ2 = lat2 * Math.PI / 180;
-                const Δφ = (lat2 - lat1) * Math.PI / 180;
-                const Δλ = (lon2 - lon1) * Math.PI / 180;
-                const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                          Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                return R * c;
-            }
-
-            // Handle time login
-            const handleTimeLogin = async () => {
-                if (isLoggedIn) {
-                    alert('Already logged in!');
-                    return;
-                }
-                const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
-                if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
-                    alert('Please enter a valid hourly rate.');
-                    return;
-                }
-
-                try {
-                    loginTime = new Date();
-                    isLoggedIn = true;
-                    document.getElementById('login-btn').disabled = true;
-                    document.getElementById('logout-btn').disabled = false;
-                    document.getElementById('status').innerHTML = `Logged in at ${loginTime.toLocaleString()}`;
-
-                    const entryData = {
-                        type: 'login',
-                        userId: currentUserId,
-                        timestamp: firebase.firestore.Timestamp.fromDate(loginTime),
-                        hourlyRate,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    await db.collection('trackerTimeEntries').add(entryData);
-                    console.log('Time entry added:', entryData);
-                } catch (error) {
-                    console.error('Time login error:', error);
-                    alert(`Error logging time: ${error.message}`);
-                }
-            };
-
-            // Handle time logout
-            const handleTimeLogout = async () => {
-                if (!isLoggedIn) {
-                    alert('Not logged in!');
-                    return;
-                }
-                try {
-                    const logoutTime = new Date();
-                    const hoursWorked = (logoutTime - loginTime) / (1000 * 60 * 60);
-                    isLoggedIn = false;
-                    document.getElementById('login-btn').disabled = false;
-                    document.getElementById('logout-btn').disabled = true;
-                    document.getElementById('status').innerHTML = `Logged out at ${logoutTime.toLocaleString()}. Hours worked: ${hoursWorked.toFixed(2)}`;
-
-                    const entryData = {
-                        type: 'logout',
-                        userId: currentUserId,
-                        timestamp: firebase.firestore.Timestamp.fromDate(logoutTime),
-                        hoursWorked,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    };
-                    await db.collection('trackerTimeEntries').add(entryData);
-                    console.log('Time entry added:', entryData);
-
-                    new Notification('Time to log out!', {
-                        body: 'Your work shift has ended.'
-                    });
-                } catch (error) {
-                    console.error('Time logout error:', error);
-                    alert(`Error logging time: ${error.message}`);
-                }
-            };
-
-            // resetHours function
-            const resetHours = async () => {
-    if (!currentUserId) {
-        alert('Please log in first.');
-        return;
-    }
-
-    if (confirm('Are you sure you want to reset all hours after payment?')) {
-        try {
-            const entries = await db.collection('trackerTimeEntries')
-                .where('userId', '==', currentUserId)
-                .get();
-
-            const batch = db.batch();
-            entries.forEach(doc => {
-                batch.delete(doc.ref);
+                };
+                script.onerror = () => reject(new Error('Failed to load Google Maps API'));
+                document.head.appendChild(script);
             });
-
-            await batch.commit();
-            console.log('All time entries deleted for user:', currentUserId);
-            document.getElementById('report').innerHTML = 'Hours reset successfully.';
-        } catch (error) {
-            console.error('Reset hours error:', error);
-            alert(`Error resetting hours: ${error.message}`);
-        }
-    }
-};
-
-            // Generate payment report
-            const generateReport = async () => {
-    if (!currentUserId) {
-        alert('Please log in first.');
-        return;
-    }
-
-    const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
-    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
-        alert('Please enter a valid hourly rate.');
-        return;
-    }
-
-    try {
-        const userDoc = await db.collection('trackerUsers').doc(currentUserId).get();
-        const username = document.getElementById('display-username').textContent;
-
-        if (!userDoc.exists || userDoc.data().username !== username) {
-            throw new Error('User profile mismatch');
         }
 
-        const entries = await db.collection('trackerTimeEntries')
-            .where('type', '==', 'logout')
-            .where('userId', '==', currentUserId)
-            .orderBy('createdAt', 'desc')
-            .get();
-
-        let totalHours = 0;
-        entries.forEach(doc => {
-            const hours = doc.data().hoursWorked;
-            if (hours && !isNaN(hours)) {
-                totalHours += hours;
-            }
-        });
-
-        const totalPay = totalHours * hourlyRate;
-
-        // Inject HTML content for report
-        document.getElementById('report').innerHTML = `
-            <h3>Payment Report for ${username}</h3>
-            <p>Total Hours: ${totalHours.toFixed(2)}</p>
-            <p>Total Pay: $${totalPay.toFixed(2)}</p>
-            <button id="download-pdf-btn">Download PDF</button>
-        `;
-
-        // Attach listeners AFTER creating buttons
-        document.getElementById('download-pdf-btn')?.addEventListener('click', () => {
-            downloadReport(totalHours, totalPay, username);
-        });
-
-        document.getElementById('reset-btn')?.addEventListener('click', resetHours);
-
-        console.log('Report generated:', { totalHours, totalPay });
-
-    } catch (error) {
-        console.error('Report error:', error);
-        if (error.code === 'unavailable' || error.message.includes('index')) {
-            alert('Error generating report: The query requires an index. Please create it in the Firebase Console.');
-        } else {
-            alert(`Error generating report: ${error.message}`);
-        }
-    }
-};
-
-            // Download PDF report
-            const downloadReport = (totalHours, totalPay, username) => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text(`Payment Report`, 10, 20);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    doc.text(`Name: ${username}`, 10, 35);
-    doc.text(`Total Hours Worked: ${totalHours.toFixed(2)} hrs`, 10, 45);
-    doc.text(`Total Pay: $${totalPay.toFixed(2)}`, 10, 55);
-
-    const date = new Date().toISOString().split('T')[0];
-    doc.save(`payment_report_${username}_${date}.pdf`);
-};
-
-            // Attach event listeners with null checks
-            const attachEventListeners = () => {
-                const loginBtnAuth = document.getElementById('login-btn-auth');
-                const signupBtn = document.getElementById('signup-btn');
-                const createProfileBtn = document.getElementById('create-profile-btn');
-                const backToLoginBtn = document.getElementById('back-to-login-btn');
-                const loginBtn = document.getElementById('login-btn');
-                const logoutBtn = document.getElementById('logout-btn');
-                const reportBtn = document.getElementById('report-btn');
-                const updateRateBtn = document.getElementById('update-rate-btn');
-                const signoutBtn = document.getElementById('signout-btn');
-                const resetBtn = document.getElementById('reset-btn');
-
-                if (loginBtnAuth) loginBtnAuth.addEventListener('click', handleLogin);
-                else console.error('login-btn-auth not found');
-                if (signupBtn) signupBtn.addEventListener('click', showSignup);
-                else console.error('signup-btn not found');
-                if (createProfileBtn) createProfileBtn.addEventListener('click', handleSignup);
-                else console.error('create-profile-btn not found');
-                if (backToLoginBtn) backToLoginBtn.addEventListener('click', showLogin);
-                else console.error('back-to-login-btn not found');
-                if (loginBtn) loginBtn.addEventListener('click', handleTimeLogin);
-                else console.error('login-btn not found');
-                if (logoutBtn) logoutBtn.addEventListener('click', handleTimeLogout);
-                else console.error('logout-btn not found');
-                if (reportBtn) reportBtn.addEventListener('click', generateReport);
-                else console.error('report-btn not found');
-                if (updateRateBtn) updateRateBtn.addEventListener('click', updateHourlyRate);
-                else console.error('update-rate-btn not found');
-                if (signoutBtn) signoutBtn.addEventListener('click', handleSignOut);
-                else console.error('signout-btn not found');
-                if (resetBtn) resetBtn.addEventListener('click', resetHours);
-                else console.error('reset-btn not found');
+        function attachEventListeners() {
+            requestAnimationFrame(() => {
+                const elements = {
+                    loginBtnAuth: document.getElementById('login-btn-auth'),
+                    signupBtn: document.getElementById('signup-btn'),
+                    createProfileBtn: document.getElementById('create-profile-btn'),
+                    backToLoginBtn: document.getElementById('back-to-login-btn'),
+                    loginBtn: document.getElementById('login-btn'),
+                    logoutBtn: document.getElementById('logout-btn'),
+                    reportBtn: document.getElementById('report-btn'),
+                    updateRateBtn: document.getElementById('update-rate-btn'),
+                    signoutBtn: document.getElementById('signout-btn'),
+                    resetBtn: document.getElementById('reset-btn')
                 };
 
-            // Attach event listeners after DOM is ready
-            attachEventListeners();
+                for (const [id, element] of Object.entries(elements)) {
+                    if (!element) {
+                        console.error(`${id} not found in DOM`);
+                        continue;
+                    }
+                    switch (id) {
+                        case 'loginBtnAuth':
+                            element.addEventListener('click', handleLogin);
+                            break;
+                        case 'signupBtn':
+                            element.addEventListener('click', showSignup);
+                            break;
+                        case 'createProfileBtn':
+                            element.addEventListener('click', handleSignup);
+                            break;
+                        case 'backToLoginBtn':
+                            element.addEventListener('click', showLogin);
+                            break;
+                        case 'loginBtn':
+                            element.addEventListener('click', handleTimeLogin);
+                            break;
+                        case 'logoutBtn':
+                            element.addEventListener('click', handleTimeLogout);
+                            break;
+                        case 'reportBtn':
+                            element.addEventListener('click', generateReport);
+                            break;
+                        case 'updateRateBtn':
+                            element.addEventListener('click', updateHourlyRate);
+                            break;
+                        case 'signoutBtn':
+                            element.addEventListener('click', handleSignOut);
+                            break;
+                        case 'resetBtn':
+                            element.addEventListener('click', resetHours);
+                            break;
+                    }
+                }
+            });
+        }
 
-            // Auth state listener
-            auth.onAuthStateChanged(user => {
-                if (user) {
-                    db.collection('trackerUsers').doc(user.uid).get().then(doc => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Load Google Maps API
+                await loadGoogleMapsAPI();
+
+                // Firebase configuration
+                const firebaseConfig = {
+                    apiKey: "AIzaSyCo1FzDthSCXINRHlyJkqdcVKq_inM71SQ",
+                    authDomain: "dulichcali-booking-calendar.firebaseapp.com",
+                    projectId: "dulichcali-booking-calendar",
+                    storageBucket: "dulichcali-booking-calendar.appspot.com",
+                    messagingSenderId: "623460884698",
+                    appId: "1:623460884698:web:a08bd435c453a7b4db05e3"
+                };
+                const app = firebase.initializeApp(firebaseConfig);
+                const auth = firebase.auth(app); // Explicitly initialize auth with app instance
+                const db = firebase.firestore(app); // Explicitly initialize firestore with app instance
+
+                // Verify Firebase initialization
+                if (!auth || !db) {
+                    throw new Error('Firebase initialization failed');
+                }
+                console.log('Firebase initialized successfully');
+
+                // Geolocation settings
+                let workLocation = { lat: 33.9416, lng: -118.4085 }; // Default: LAX
+                const geofenceRadius = 500; // meters
+                let isLoggedIn = false;
+                let loginTime = null;
+                let currentUserId = '';
+                let geolocationWatcher = null;
+
+                // Request notification permission with mobile-friendly handling
+                if ('Notification' in window) {
+                    Notification.requestPermission().then(permission => {
+                        if (permission !== 'granted') {
+                            document.getElementById('status').innerHTML = 'Notifications disabled. Login prompts may not appear.';
+                        }
+                    }).catch(error => {
+                        console.error('Notification permission error:', error);
+                    });
+                } else {
+                    console.warn('Notifications not supported on this device.');
+                }
+
+                // Toggle between signup and login forms
+                window.showSignup = function() {
+                    const loginForm = document.getElementById('login-form');
+                    const signupForm = document.getElementById('signup-form');
+                    if (loginForm && signupForm) {
+                        loginForm.classList.add('hidden');
+                        signupForm.classList.remove('hidden');
+                        document.getElementById('login-username').value = '';
+                        document.getElementById('login-password').value = '';
+                    } else {
+                        console.error('Login or signup form not found');
+                    }
+                };
+
+                window.showLogin = function() {
+                    const signupForm = document.getElementById('signup-form');
+                    const loginForm = document.getElementById('login-form');
+                    if (signupForm && loginForm) {
+                        signupForm.classList.add('hidden');
+                        loginForm.classList.remove('hidden');
+                        document.getElementById('signup-username').value = '';
+                        document.getElementById('signup-password').value = '';
+                        document.getElementById('signup-work-address').value = '';
+                        document.getElementById('signup-hourly-rate').value = '';
+                    } else {
+                        console.error('Signup or login form not found');
+                    }
+                };
+
+                // Handle signup
+                window.handleSignup = async function() {
+                    if (!geocoder) {
+                        alert('Geocoder not initialized. Please try again or refresh the page.');
+                        return;
+                    }
+                    const username = document.getElementById('signup-username')?.value.trim();
+                    const password = document.getElementById('signup-password')?.value;
+                    const workAddress = document.getElementById('signup-work-address')?.value.trim();
+                    const hourlyRate = parseFloat(document.getElementById('signup-hourly-rate')?.value);
+
+                    if (!username || username.length < 3) {
+                        alert('Username must be at least 3 characters long.');
+                        return;
+                    }
+                    if (!password || password.length < 6) {
+                        alert('Password must be at least 6 characters long.');
+                        return;
+                    }
+                    if (!workAddress) {
+                        alert('Please enter a valid work address (e.g., 123 Main St, Los Angeles, CA).');
+                        return;
+                    }
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
+                        alert('Please enter a valid hourly rate greater than 0.');
+                        return;
+                    }
+
+                    try {
+                        const user = auth.currentUser;
+                        if (user) await auth.signOut();
+
+                        const email = `${username.toLowerCase()}@timetracker.app`;
+                        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                        const userId = userCredential.user.uid;
+
+                        const result = await new Promise((resolve, reject) => {
+                            geocoder.geocode({ address: workAddress }, (results, status) => {
+                                if (status === 'OK') resolve(results[0].geometry.location);
+                                else reject(`Geocoding failed: ${status}`);
+                            });
+                        });
+
+                        const lat = result.lat();
+                        const lng = result.lng();
+                        if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+                            throw new Error('Invalid geolocation coordinates');
+                        }
+
+                        await db.collection('trackerUsers').doc(userId).set({
+                            username,
+                            workAddress,
+                            workLocation: { lat, lng },
+                            hourlyRate,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log('Profile saved for userId:', userId);
+
+                        currentUserId = userId;
+                        workLocation = { lat, lng };
+                        showTrackerSection(username, workAddress, hourlyRate);
+                        document.getElementById('status').innerHTML = `Profile created for ${username}. Welcome!`;
+                    } catch (error) {
+                        console.error('Signup error:', error);
+                        alert(`Error creating profile: ${error.message}`);
+                    }
+                };
+
+                // Handle login
+                window.handleLogin = async function() {
+                    const username = document.getElementById('login-username')?.value.trim();
+                    const password = document.getElementById('login-password')?.value;
+
+                    if (!username || !password) {
+                        alert('Please enter both username and password.');
+                        return;
+                    }
+
+                    try {
+                        const email = `${username.toLowerCase()}@timetracker.app`;
+                        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                        const userId = userCredential.user.uid;
+
+                        const doc = await db.collection('trackerUsers').doc(userId).get();
                         if (doc.exists) {
                             const data = doc.data();
-                            currentUserId = user.uid;
+                            currentUserId = userId;
                             workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
                             showTrackerSection(data.username, data.workAddress, data.hourlyRate);
                             document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
-                            checkLocation();
+                        } else {
+                            alert('Profile not found. Please sign up.');
+                            await auth.signOut();
                         }
-                    }).catch(error => {
-                        console.error('Profile load error:', error);
-                        document.getElementById('status').innerHTML = `Error loading profile: ${error.message}`;
-                    });
-                } else {
-                    document.getElementById('auth-section').classList.remove('hidden');
-                    document.getElementById('tracker-section').classList.add('hidden');
+                    } catch (error) {
+                        console.error('Login error:', error);
+                        alert(`Error logging in: ${error.message}`);
+                    }
+                };
+
+                // Handle sign out
+                window.handleSignOut = async function() {
+                    try {
+                        if (geolocationWatcher) {
+                            navigator.geolocation.clearWatch(geolocationWatcher);
+                            geolocationWatcher = null;
+                        }
+                        await auth.signOut();
+                        currentUserId = '';
+                        isLoggedIn = false;
+                        document.getElementById('tracker-section').classList.add('hidden');
+                        document.getElementById('auth-section').classList.remove('hidden');
+                        document.getElementById('status').innerHTML = 'Signed out successfully.';
+                    } catch (error) {
+                        console.error('Sign out error:', error);
+                        alert(`Error signing out: ${error.message}`);
+                    }
+                };
+
+                // Show tracker section
+                function showTrackerSection(username, workAddress, hourlyRate) {
+                    const authSection = document.getElementById('auth-section');
+                    const trackerSection = document.getElementById('tracker-section');
+                    if (authSection && trackerSection) {
+                        authSection.classList.add('hidden');
+                        trackerSection.classList.remove('hidden');
+                        document.getElementById('display-username').textContent = username;
+                        document.getElementById('display-work-address').textContent = workAddress;
+                        document.getElementById('hourly-rate').value = hourlyRate || 0;
+                    } else {
+                        console.error('Tracker section or auth section not found');
+                    }
                 }
-            });
+
+                // Update hourly rate
+                window.updateHourlyRate = async function() {
+                    const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
+                        alert('Please enter a valid hourly rate greater than 0.');
+                        return;
+                    }
+                    try {
+                        await db.collection('trackerUsers').doc(currentUserId).update({
+                            hourlyRate,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                        console.log('Hourly rate updated:', hourlyRate);
+                        document.getElementById('status').innerHTML = `Hourly rate updated to $${hourlyRate}`;
+                    } catch (error) {
+                        console.error('Update hourly rate error:', error);
+                        alert(`Error updating hourly rate: ${error.message}`);
+                    }
+                };
+
+                // Check location periodically
+                function checkLocation() {
+                    if (geolocationWatcher) {
+                        navigator.geolocation.clearWatch(geolocationWatcher);
+                    }
+                    geolocationWatcher = navigator.geolocation.watchPosition(
+                        position => {
+                            const userLat = position.coords.latitude;
+                            const userLng = position.coords.longitude;
+                            const distance = getDistance(userLat, userLng, workLocation.lat, workLocation.lng);
+                            if (distance <= geofenceRadius && !isLoggedIn && currentUserId) {
+                                new Notification('Time to log in!', {
+                                    body: 'You have arrived at your work location.'
+                                });
+                                document.getElementById('status').innerHTML = 'Please log in to start tracking time.';
+                            }
+                        },
+                        error => {
+                            console.error('Geolocation error:', error);
+                            document.getElementById('status').innerHTML = 'Unable to access location. Please log in manually.';
+                        },
+                        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+                    );
+                }
+
+                // Calculate distance in meters
+                function getDistance(lat1, lon1, lat2, lon2) {
+                    const R = 6371e3;
+                    const φ1 = lat1 * Math.PI / 180;
+                    const φ2 = lat2 * Math.PI / 180;
+                    const Δφ = (lat2 - lat1) * Math.PI / 180;
+                    const Δλ = (lon2 - lon1) * Math.PI / 180;
+                    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                              Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    return R * c;
+                }
+
+                // Handle time login
+                window.handleTimeLogin = async function() {
+                    if (isLoggedIn) {
+                        alert('Already logged in!');
+                        return;
+                    }
+                    const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
+                        alert('Please enter a valid hourly rate.');
+                        return;
+                    }
+
+                    try {
+                        loginTime = new Date();
+                        isLoggedIn = true;
+                        document.getElementById('login-btn').disabled = true;
+                        document.getElementById('logout-btn').disabled = false;
+                        document.getElementById('status').innerHTML = `Logged in at ${loginTime.toLocaleString()}`;
+
+                        const entryData = {
+                            type: 'login',
+                            userId: currentUserId,
+                            timestamp: firebase.firestore.Timestamp.fromDate(loginTime),
+                            hourlyRate,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        await db.collection('trackerTimeEntries').add(entryData);
+                        console.log('Time entry added:', entryData);
+                    } catch (error) {
+                        console.error('Time login error:', error);
+                        alert(`Error logging time: ${error.message}`);
+                    }
+                };
+
+                // Handle time logout
+                window.handleTimeLogout = async function() {
+                    if (!isLoggedIn) {
+                        alert('Not logged in!');
+                        return;
+                    }
+                    try {
+                        const logoutTime = new Date();
+                        const hoursWorked = (logoutTime - loginTime) / (1000 * 60 * 60);
+                        isLoggedIn = false;
+                        document.getElementById('login-btn').disabled = false;
+                        document.getElementById('logout-btn').disabled = true;
+                        document.getElementById('status').innerHTML = `Logged out at ${logoutTime.toLocaleString()}. Hours worked: ${hoursWorked.toFixed(2)}`;
+
+                        const entryData = {
+                            type: 'logout',
+                            userId: currentUserId,
+                            timestamp: firebase.firestore.Timestamp.fromDate(logoutTime),
+                            hoursWorked,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        };
+                        await db.collection('trackerTimeEntries').add(entryData);
+                        console.log('Time entry added:', entryData);
+
+                        new Notification('Time to log out!', {
+                            body: 'Your work shift has ended.'
+                        });
+                    } catch (error) {
+                        console.error('Time logout error:', error);
+                        alert(`Error logging time: ${error.message}`);
+                    }
+                };
+
+                // Generate payment report
+                window.generateReport = async function() {
+                    if (!currentUserId) {
+                        alert('Please log in first.');
+                        return;
+                    }
+                    const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
+                        alert('Please enter a valid hourly rate.');
+                        return;
+                    }
+
+                    try {
+                        const userDoc = await db.collection('trackerUsers').doc(currentUserId).get();
+                        const username = document.getElementById('display-username').textContent;
+
+                        if (!userDoc.exists || userDoc.data().username !== username) {
+                            throw new Error('User profile mismatch');
+                        }
+
+                        const entries = await db.collection('trackerTimeEntries')
+                            .where('type', '==', 'logout')
+                            .where('userId', '==', currentUserId)
+                            .orderBy('createdAt', 'desc')
+                            .get();
+
+                        let totalHours = 0;
+                        entries.forEach(doc => {
+                            const hours = doc.data().hoursWorked;
+                            if (hours && !isNaN(hours)) {
+                                totalHours += hours;
+                            }
+                        });
+
+                        const totalPay = totalHours * hourlyRate;
+
+                        document.getElementById('report').innerHTML = `
+                            <h3>Payment Report for ${username}</h3>
+                            <p>Total Hours: ${totalHours.toFixed(2)}</p>
+                            <p>Total Pay: $${totalPay.toFixed(2)}</p>
+                            <button id="download-pdf-btn">Download PDF</button>
+                            <button id="reset-btn">Reset Hours</button>
+                        `;
+
+                        document.getElementById('download-pdf-btn')?.addEventListener('click', () => {
+                            downloadReport(totalHours, totalPay, username);
+                        });
+                        document.getElementById('reset-btn')?.addEventListener('click', resetHours);
+
+                        console.log('Report generated:', { totalHours, totalPay });
+                    } catch (error) {
+                        console.error('Report error:', error);
+                        if (error.code === 'unavailable' || error.message.includes('index')) {
+                            alert('Error generating report: The query requires an index. Please create it in the Firebase Console.');
+                        } else {
+                            alert(`Error generating report: ${error.message}`);
+                        }
+                    }
+                };
+
+                // Download PDF report
+                window.downloadReport = function(totalHours, totalPay, username) {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+
+                    doc.setFont("helvetica", "bold");
+                    doc.setFontSize(16);
+                    doc.text(`Payment Report`, 10, 20);
+
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(12);
+                    doc.text(`Name: ${username}`, 10, 35);
+                    doc.text(`Total Hours Worked: ${totalHours.toFixed(2)} hrs`, 10, 45);
+                    doc.text(`Total Pay: $${totalPay.toFixed(2)}`, 10, 55);
+
+                    const date = new Date().toISOString().split('T')[0];
+                    doc.save(`payment_report_${username}_${date}.pdf`);
+                };
+
+                // Reset hours
+                window.resetHours = async function() {
+                    if (!currentUserId) {
+                        alert('Please log in first.');
+                        return;
+                    }
+                    if (confirm('Are you sure you want to reset all hours after payment?')) {
+                        try {
+                            const entries = await db.collection('trackerTimeEntries')
+                                .where('userId', '==', currentUserId)
+                                .get();
+                            const batch = db.batch();
+                            entries.forEach(doc => {
+                                batch.delete(doc.ref);
+                            });
+                            await batch.commit();
+                            console.log('All time entries deleted for user:', currentUserId);
+                            document.getElementById('report').innerHTML = 'Hours reset successfully.';
+                        } catch (error) {
+                            console.error('Reset hours error:', error);
+                            alert(`Error resetting hours: ${error.message}`);
+                        }
+                    }
+                };
+
+                // Attach event listeners
+                attachEventListeners();
+
+                // Auth state listener
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        db.collection('trackerUsers').doc(user.uid).get().then(doc => {
+                            if (doc.exists) {
+                                const data = doc.data();
+                                currentUserId = user.uid;
+                                workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
+                                showTrackerSection(data.username, data.workAddress, data.hourlyRate);
+                                document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
+                                checkLocation();
+                            }
+                        }).catch(error => {
+                            console.error('Profile load error:', error);
+                            document.getElementById('status').innerHTML = `Error loading profile: ${error.message}`;
+                        });
+                    } else {
+                        document.getElementById('auth-section').classList.remove('hidden');
+                        document.getElementById('tracker-section').classList.add('hidden');
+                    }
+                });
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                alert(`Error initializing app: ${error.message}. Please check your internet connection or refresh the page.`);
+                // Optional: Retry loading
+                setTimeout(() => window.location.reload(), 5000); // Retry after 5 seconds
+            }
         });
     </script>
 </body>
