@@ -569,6 +569,7 @@
                     if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) return alert('Invalid hourly rate.');
                     try {
                         loginTime = new Date();
+                        console.log('Login time set:', loginTime); // Debug log
                         isLoggedIn = true;
                         document.getElementById('login-btn').disabled = true;
                         document.getElementById('logout-btn').disabled = false;
@@ -589,7 +590,12 @@
                     if (!isLoggedIn) return alert('Not logged in!');
                     try {
                         const logoutTime = new Date();
+                        console.log('Logout time set:', logoutTime); // Debug log
+                        if (!loginTime || isNaN(loginTime.getTime())) {
+                            throw new Error('Invalid login time recorded');
+                        }
                         const hoursWorked = (logoutTime - loginTime) / (1000 * 60 * 60);
+                        console.log('Calculated hours worked:', hoursWorked); // Debug log
                         isLoggedIn = false;
                         document.getElementById('login-btn').disabled = false;
                         document.getElementById('logout-btn').disabled = true;
