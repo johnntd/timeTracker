@@ -162,7 +162,7 @@
             <div id="signup-form" class="hidden">
                 <div class="form-group">
                     <label for="signup-username">Username</label>
-                    <input type="text" id="signup-username" placeholder="Choose username" required autocomplete="username">
+                    <input type="text" id="signup-username" placeholder="Choose username" required autocomplete="username" pattern="[a-zA-Z0-9._-]+">
                 </div>
                 <div class="form-group">
                     <label for="signup-password">Password</label>
@@ -348,11 +348,9 @@
                 if ('Notification' in window) {
                     Notification.requestPermission().then(permission => {
                         if (permission !== 'granted') {
-                            document.getElementById('status').innerHTML = 'Notifications disabled. Login prompts may not appear.';
+                            document.getElementById('status').innerHTML = 'Notifications disabled.';
                         }
                     }).catch(error => console.error('Notification permission error:', error));
-                } else {
-                    console.warn('Notifications not supported on this device.');
                 }
 
                 // Toggle forms
@@ -391,20 +389,36 @@
                     const workAddress = document.getElementById('signup-work-address')?.value.trim();
                     const hourlyRate = parseFloat(document.getElementById('signup-hourly-rate')?.value);
 
-                    if (!username || username.length < 3) return alert('Username must be at least 3 characters.');
-                    if (!password || password.length < 6) return alert('Password must be at least 6 characters.');
-                    if (!workAddress) return alert('Please enter a work address.');
-                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) return alert('Please enter a valid hourly rate.');
+                    // Validate username for email compatibility
+                    const emailPattern = /^[a-zA-Z0-9._-]+$/;
+                    if (!username || username.length < 3 || !emailPattern.test(username)) {
+                        alert('Username must be 3+ characters and contain only letters, numbers, dots, hyphens, or underscores.');
+                        return;
+                    }
+                    if (!password || password.length < 6) {
+                        alert('Password must be at least 6 characters.');
+                        return;
+                    }
+                    if (!workAddress) {
+                        alert('Please enter a work address.');
+                        return;
+                    }
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
+                        alert('Please enter a valid hourly rate.');
+                        return;
+                    }
 
                     try {
                         if (auth.currentUser) await auth.signOut();
                         const email = `${username.toLowerCase()}@timetracker.app`;
+                        console.log('Attempting signup with email:', email); // Debug log
                         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                         const userId = userCredential.user.uid;
 
                         const result = await new Promise((resolve, reject) => {
                             geocoder.geocode({ address: workAddress }, (results, status) => {
-                                status === 'OK' ? resolve(results[0].geometry.location) : reject(`Geocoding failed: ${status}`);
+                                if (status === 'OK') resolve(results[0].geometry.location);
+                                else reject(`Geocoding failed: ${status}`);
                             });
                         });
 
@@ -422,8 +436,8 @@
                         showTrackerSection(username, workAddress, hourlyRate);
                         document.getElementById('status').innerHTML = `Profile created for ${username}.`;
                     } catch (error) {
-                        console.error('Signup error:', error);
-                        alert(`Signup failed: ${error.message}`);
+                        console.error('Signup error:', error.code, error.message);
+                        alert(`Signup failed: ${error.message} (Code: ${error.code})`);
                     }
                 };
 
@@ -437,6 +451,7 @@
                     for (let attempt = 1; attempt <= maxRetries; attempt++) {
                         try {
                             const email = `${username.toLowerCase()}@timetracker.app`;
+                            console.log('Attempting login with email:', email); // Debug log
                             const userCredential = await auth.signInWithEmailAndPassword(email, password);
                             const userId = userCredential.user.uid;
 
@@ -457,7 +472,7 @@
                         } catch (error) {
                             console.error(`Login attempt ${attempt} error:`, error.code, error.message);
                             if (attempt === maxRetries) {
-                                alert(`Login failed: ${error.message}. Check credentials or internet.`);
+                                alert(`Login failed: ${error.message} (Code: ${error.code}). Check credentials or internet.`);
                             } else {
                                 await new Promise(resolve => setTimeout(resolve, delay));
                             }
@@ -588,99 +603,3 @@
 
                 // Generate payment report
                 window.generateReport = async () => {
-                    if (!currentUserId) return alert('Please log in first.');
-                    const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
-                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) return alert('Invalid hourly rate.');
-                    try {
-                        const userDoc = await db.collection('trackerUsers').doc(currentUserId).get();
-                        if (!userDoc.exists || userDoc.data().username !== document.getElementById('display-username').textContent) {
-                            throw new Error('User profile mismatch');
-                        }
-
-                        const entries = await db.collection('trackerTimeEntries')
-                            .where('type', '==', 'logout')
-                            .where('userId', '==', currentUserId)
-                            .orderBy('createdAt', 'desc')
-                            .get();
-
-                        let totalHours = 0;
-                        entries.forEach(doc => {
-                            const hours = doc.data().hoursWorked;
-                            if (hours && !isNaN(hours)) totalHours += hours;
-                        });
-
-                        const totalPay = totalHours * hourlyRate;
-                        const username = document.getElementById('display-username').textContent;
-                        document.getElementById('report').innerHTML = `
-                            <h3>Report for ${username}</h3>
-                            <p>Hours: ${totalHours.toFixed(2)}</p>
-                            <p>Pay: $${totalPay.toFixed(2)}</p>
-                            <button id="download-pdf-btn">Download</button>
-                            <button id="reset-btn">Reset</button>
-                        `;
-                        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReport(totalHours, totalPay, username));
-                        document.getElementById('reset-btn').addEventListener('click', resetHours);
-                    } catch (error) {
-                        console.error('Report error:', error);
-                        alert(`Report failed: ${error.message.includes('index') ? 'Index required. Create it in Firebase Console.' : error.message}`);
-                    }
-                };
-
-                // Download PDF report
-                window.downloadReport = (totalHours, totalPay, username) => {
-                    const { jsPDF } = window.jspdf;
-                    const doc = new jsPDF();
-                    doc.text(`Time Tracker Report`, 10, 10);
-                    doc.text(`Name: ${username}`, 10, 20);
-                    doc.text(`Hours: ${totalHours.toFixed(2)}`, 10, 30);
-                    doc.text(`Pay: $${totalPay.toFixed(2)}`, 10, 40);
-                    doc.save(`report_${username}_${new Date().toISOString().split('T')[0]}.pdf`);
-                };
-
-                // Reset hours
-                window.resetHours = async () => {
-                    if (!currentUserId) return alert('Please log in first.');
-                    if (confirm('Reset all hours?')) {
-                        try {
-                            const snapshot = await db.collection('trackerTimeEntries').where('userId', '==', currentUserId).get();
-                            const batch = db.batch();
-                            snapshot.forEach(doc => batch.delete(doc.ref));
-                            await batch.commit();
-                            document.getElementById('report').innerHTML = 'Hours reset.';
-                        } catch (error) {
-                            console.error('Reset error:', error);
-                            alert(`Reset failed: ${error.message}`);
-                        }
-                    }
-                };
-
-                // Attach event listeners
-                attachEventListeners();
-
-                // Auth state listener
-                auth.onAuthStateChanged(user => {
-                    if (user) {
-                        db.collection('trackerUsers').doc(user.uid).get().then(doc => {
-                            if (doc.exists) {
-                                const { username, workAddress, hourlyRate, workLocation } = doc.data();
-                                currentUserId = user.uid;
-                                workLocation = workLocation || { lat: 33.9416, lng: -118.4085 };
-                                showTrackerSection(username, workAddress, hourlyRate);
-                                document.getElementById('status').innerHTML = `Welcome, ${username}`;
-                                checkLocation();
-                            }
-                        }).catch(error => console.error('Profile load error:', error));
-                    } else {
-                        document.getElementById('auth-section').classList.remove('hidden');
-                        document.getElementById('tracker-section').classList.add('hidden');
-                    }
-                });
-            } catch (error) {
-                console.error('Initialization error:', error);
-                alert(`App failed to start: ${error.message}. Retrying in 5 seconds...`);
-                setTimeout(() => location.reload(), 5000);
-            }
-        });
-    </script>
-</body>
-</html>
