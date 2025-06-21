@@ -455,6 +455,18 @@
                             const userCredential = await auth.signInWithEmailAndPassword(email, password);
                             const userId = userCredential.user.uid;
 
+                            // Check and update active session
+                            const sessionRef = db.collection('activeSessions').doc(userId);
+                            const sessionDoc = await sessionRef.get();
+                            if (sessionDoc.exists) {
+                                await auth.signOut(); // Logout previous session
+                                console.log(`Logged out previous session for userId: ${userId}`);
+                            }
+                            await sessionRef.set({
+                                lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                                userId
+                            });
+
                             const doc = await db.collection('trackerUsers').doc(userId).get();
                             if (doc.exists) {
                                 const data = doc.data();
@@ -486,6 +498,9 @@
                         if (geolocationWatcher) {
                             navigator.geolocation.clearWatch(geolocationWatcher);
                             geolocationWatcher = null;
+                        }
+                        if (currentUserId) {
+                            await db.collection('activeSessions').doc(currentUserId).delete();
                         }
                         await auth.signOut();
                         currentUserId = '';
@@ -672,20 +687,26 @@
                 // Attach event listeners
                 attachEventListeners();
 
-                // Auth state listener
-                auth.onAuthStateChanged(user => {
-                    if (user) {
-                        db.collection('trackerUsers').doc(user.uid).get().then(doc => {
-                            if (doc.exists) {
-                                const { username, workAddress, hourlyRate, workLocation } = doc.data();
-                                currentUserId = user.uid;
-                                workLocation = workLocation || { lat: 33.9416, lng: -118.4085 };
-                                showTrackerSection(username, workAddress, hourlyRate);
-                                document.getElementById('status').innerHTML = `Welcome, ${username}`;
-                                checkLocation();
-                            }
-                        }).catch(error => console.error('Profile load error:', error));
-                    } else {
+                // Auth state listener with session conflict handling
+                auth.onAuthStateChanged(async (user) => {
+                    if (user && currentUserId) {
+                        const sessionRef = db.collection('activeSessions').doc(currentUserId);
+                        const sessionDoc = await sessionRef.get();
+                        if (!sessionDoc.exists || sessionDoc.data().userId !== currentUserId) {
+                            await handleSignOut(); // Logout if session conflict detected
+                            alert('You have been logged out from another device.');
+                        } else {
+                            db.collection('trackerUsers').doc(currentUserId).get().then(doc => {
+                                if (doc.exists) {
+                                    const { username, workAddress, hourlyRate, workLocation } = doc.data();
+                                    workLocation = workLocation || { lat: 33.9416, lng: -118.4085 };
+                                    showTrackerSection(username, workAddress, hourlyRate);
+                                    document.getElementById('status').innerHTML = `Welcome, ${username}`;
+                                    checkLocation();
+                                }
+                            }).catch(error => console.error('Profile load error:', error));
+                        }
+                    } else if (!user) {
                         document.getElementById('auth-section').classList.remove('hidden');
                         document.getElementById('tracker-section').classList.add('hidden');
                     }
