@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Time Tracker</title>
     <style>
         * {
@@ -11,78 +12,87 @@
             box-sizing: border-box;
         }
         body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.5;
             color: #333;
-            background: linear-gradient(to bottom, #e0f7fa, #80deea);
+            background: linear-gradient(180deg, #e0f7fa, #80deea);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            -webkit-tap-highlight-color: transparent;
         }
         header {
             background: #00695c;
             color: white;
             padding: 1em;
             text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
         header h1 {
-            font-size: 1.8em;
+            font-size: 1.6em;
+            font-weight: 500;
         }
         main {
             flex: 1;
-            max-width: 100%;
-            margin: 1em;
-            padding: 1em;
+            padding: 1em 0.5em;
             background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 10px 10px 0 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 0;
         }
         .section {
-            margin-bottom: 1.5em;
+            margin-bottom: 1.2em;
         }
         .section h2 {
-            font-size: 1.3em;
-            margin-bottom: 0.8em;
+            font-size: 1.2em;
+            margin-bottom: 0.6em;
             color: #00695c;
+            font-weight: 600;
         }
         .form-group {
             margin-bottom: 1em;
         }
         label {
             display: block;
-            margin-bottom: 0.4em;
-            font-weight: bold;
-            font-size: 1em;
+            margin-bottom: 0.3em;
+            font-size: 0.9em;
+            font-weight: 500;
         }
         input, button {
             width: 100%;
             padding: 0.6em;
             border: 1px solid #ccc;
-            border-radius: 6px;
+            border-radius: 8px;
             font-size: 1em;
             box-sizing: border-box;
-            min-height: 2.5em;
+            min-height: 2.4em;
+            font-family: inherit;
         }
         button {
             background: #00695c;
             color: white;
             border: none;
             cursor: pointer;
-            margin-top: 0.6em;
+            margin-top: 0.5em;
             padding: 0.7em;
-            font-size: 1.1em;
-            border-radius: 6px;
+            font-size: 1em;
+            border-radius: 8px;
             transition: background 0.3s;
+            touch-action: manipulation;
         }
-        button:hover {
+        button:hover, button:focus {
             background: #00897b;
+            outline: none;
         }
         #status, #report {
             margin-top: 1em;
-            padding: 1em;
+            padding: 0.8em;
             background: #f9f9f9;
-            border-radius: 6px;
-            font-size: 1em;
+            border-radius: 8px;
+            font-size: 0.9em;
+            text-align: center;
         }
         .hidden {
             display: none;
@@ -91,31 +101,43 @@
             background: #00695c;
             color: white;
             text-align: center;
-            padding: 1em;
+            padding: 0.8em;
             margin-top: auto;
+            font-size: 0.8em;
         }
-        @media (max-width: 600px) {
+        @media (min-width: 601px) {
             header h1 {
-                font-size: 1.5em;
+                font-size: 2em;
             }
             main {
-                margin: 0.5em;
-                padding: 0.8em;
+                max-width: 600px;
+                margin: 1em auto;
+                padding: 1.5em;
+                border-radius: 10px;
+                box-shadow: 0 0 10px rgba(0,0,0,0.1);
             }
             .section h2 {
-                font-size: 1.2em;
+                font-size: 1.5em;
+            }
+            label {
+                font-size: 1em;
             }
             input, button {
-                padding: 0.5em;
-                min-height: 2.2em;
+                padding: 0.8em;
+                min-height: 2.6em;
             }
             button {
+                font-size: 1.1em;
+                padding: 0.9em;
+            }
+            #status, #report {
                 font-size: 1em;
-                padding: 0.6em;
+            }
+            footer {
+                font-size: 0.9em;
             }
         }
     </style>
-    <!-- Scripts loaded dynamically -->
 </head>
 <body>
     <header>
@@ -128,11 +150,11 @@
             <div id="login-form">
                 <div class="form-group">
                     <label for="login-username">Username</label>
-                    <input type="text" id="login-username" placeholder="Enter username" required>
+                    <input type="text" id="login-username" placeholder="Enter username" required autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label for="login-password">Password</label>
-                    <input type="password" id="login-password" placeholder="Enter password" required>
+                    <input type="password" id="login-password" placeholder="Enter password" required autocomplete="current-password">
                 </div>
                 <button id="login-btn-auth">Login</button>
                 <button id="signup-btn">Sign Up</button>
@@ -140,19 +162,19 @@
             <div id="signup-form" class="hidden">
                 <div class="form-group">
                     <label for="signup-username">Username</label>
-                    <input type="text" id="signup-username" placeholder="Choose username" required>
+                    <input type="text" id="signup-username" placeholder="Choose username" required autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label for="signup-password">Password</label>
-                    <input type="password" id="signup-password" placeholder="Choose password (6+ chars)" required>
+                    <input type="password" id="signup-password" placeholder="Choose password (6+ chars)" required autocomplete="new-password" minlength="6">
                 </div>
                 <div class="form-group">
                     <label for="signup-work-address">Work Address</label>
-                    <input type="text" id="signup-work-address" placeholder="Enter work address (e.g., 123 Main St, Los Angeles, CA)" required>
+                    <input type="text" id="signup-work-address" placeholder="Enter work address (e.g., 123 Main St, LA)" required>
                 </div>
                 <div class="form-group">
                     <label for="signup-hourly-rate">Hourly Rate ($)</label>
-                    <input type="number" id="signup-hourly-rate" step="0.01" placeholder="Enter hourly rate" required>
+                    <input type="number" id="signup-hourly-rate" step="0.01" placeholder="Enter hourly rate" required min="0.01">
                 </div>
                 <button id="create-profile-btn">Create Profile</button>
                 <button id="back-to-login-btn">Back to Login</button>
@@ -172,11 +194,11 @@
             <div class="form-group">
                 <label for="hourly-rate">Hourly Rate ($):</label>
                 <input type="number" id="hourly-rate" step="0.01" required>
-                <button id="update-rate-btn">Update Hourly Rate</button>
+                <button id="update-rate-btn">Update Rate</button>
             </div>
-            <button id="login-btn">Log In</button>
-            <button id="logout-btn" disabled>Log Out</button>
-            <button id="report-btn">Generate Payment Report</button>
+            <button id="login-btn">Start Shift</button>
+            <button id="logout-btn" disabled>End Shift</button>
+            <button id="report-btn">View Report</button>
             <button id="reset-btn">Reset Hours</button>
             <button id="signout-btn">Sign Out</button>
             <div id="status"></div>
@@ -185,11 +207,41 @@
     </main>
 
     <footer>
-        <p>Time Tracker App</p>
+        <p>© 2025 Time Tracker</p>
     </footer>
 
     <script>
-        let geocoder;
+        let geocoder, app, auth, db;
+
+        async function loadDependencies(maxRetries = 3, delay = 2000) {
+            const scripts = [
+                { src: 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js', name: 'Firebase App' },
+                { src: 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js', name: 'Firebase Auth' },
+                { src: 'https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js', name: 'Firebase Firestore' },
+                { src: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js', name: 'jsPDF' }
+            ];
+
+            for (const script of scripts) {
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        await new Promise((resolve, reject) => {
+                            const scriptElement = document.createElement('script');
+                            scriptElement.src = script.src;
+                            scriptElement.async = true;
+                            scriptElement.onload = resolve;
+                            scriptElement.onerror = () => reject(new Error(`Failed to load ${script.name}`));
+                            document.head.appendChild(scriptElement);
+                        });
+                        console.log(`${script.name} loaded successfully on attempt ${attempt}`);
+                        break;
+                    } catch (error) {
+                        console.error(`${script.name} loading attempt ${attempt} failed:`, error);
+                        if (attempt === maxRetries) throw error;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+        }
 
         async function loadGoogleMapsAPI(maxRetries = 3, delay = 2000) {
             for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -216,11 +268,11 @@
                         script.onerror = () => reject(new Error('Failed to load Google Maps API'));
                         document.head.appendChild(script);
                     });
-                    return; // Exit if successful
+                    return;
                 } catch (error) {
                     console.error(`Attempt ${attempt} to load Google Maps API failed:`, error);
                     if (attempt === maxRetries) throw error;
-                    await new Promise(resolve => setTimeout(resolve, delay)); // Wait before retry
+                    await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
         }
@@ -246,36 +298,16 @@
                         continue;
                     }
                     switch (id) {
-                        case 'loginBtnAuth':
-                            element.addEventListener('click', handleLogin);
-                            break;
-                        case 'signupBtn':
-                            element.addEventListener('click', showSignup);
-                            break;
-                        case 'createProfileBtn':
-                            element.addEventListener('click', handleSignup);
-                            break;
-                        case 'backToLoginBtn':
-                            element.addEventListener('click', showLogin);
-                            break;
-                        case 'loginBtn':
-                            element.addEventListener('click', handleTimeLogin);
-                            break;
-                        case 'logoutBtn':
-                            element.addEventListener('click', handleTimeLogout);
-                            break;
-                        case 'reportBtn':
-                            element.addEventListener('click', generateReport);
-                            break;
-                        case 'updateRateBtn':
-                            element.addEventListener('click', updateHourlyRate);
-                            break;
-                        case 'signoutBtn':
-                            element.addEventListener('click', handleSignOut);
-                            break;
-                        case 'resetBtn':
-                            element.addEventListener('click', resetHours);
-                            break;
+                        case 'loginBtnAuth': element.addEventListener('click', handleLogin); break;
+                        case 'signupBtn': element.addEventListener('click', showSignup); break;
+                        case 'createProfileBtn': element.addEventListener('click', handleSignup); break;
+                        case 'backToLoginBtn': element.addEventListener('click', showLogin); break;
+                        case 'loginBtn': element.addEventListener('click', handleTimeLogin); break;
+                        case 'logoutBtn': element.addEventListener('click', handleTimeLogout); break;
+                        case 'reportBtn': element.addEventListener('click', generateReport); break;
+                        case 'updateRateBtn': element.addEventListener('click', updateHourlyRate); break;
+                        case 'signoutBtn': element.addEventListener('click', handleSignOut); break;
+                        case 'resetBtn': element.addEventListener('click', resetHours); break;
                     }
                 }
             });
@@ -283,41 +315,9 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Load Google Maps API with retry
+                // Load all dependencies sequentially
+                await loadDependencies();
                 await loadGoogleMapsAPI();
-
-                // Load Firebase and other dependencies
-                const firebaseScript = document.createElement('script');
-                firebaseScript.src = 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js';
-                await new Promise((resolve, reject) => {
-                    firebaseScript.onload = resolve;
-                    firebaseScript.onerror = () => reject(new Error('Failed to load Firebase App'));
-                    document.head.appendChild(firebaseScript);
-                });
-
-                const firebaseAuthScript = document.createElement('script');
-                firebaseAuthScript.src = 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js';
-                await new Promise((resolve, reject) => {
-                    firebaseAuthScript.onload = resolve;
-                    firebaseAuthScript.onerror = () => reject(new Error('Failed to load Firebase Auth'));
-                    document.head.appendChild(firebaseAuthScript);
-                });
-
-                const firebaseFirestoreScript = document.createElement('script');
-                firebaseFirestoreScript.src = 'https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js';
-                await new Promise((resolve, reject) => {
-                    firebaseFirestoreScript.onload = resolve;
-                    firebaseFirestoreScript.onerror = () => reject(new Error('Failed to load Firebase Firestore'));
-                    document.head.appendChild(firebaseFirestoreScript);
-                });
-
-                const jsPDFScript = document.createElement('script');
-                jsPDFScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-                await new Promise((resolve, reject) => {
-                    jsPDFScript.onload = resolve;
-                    jsPDFScript.onerror = () => reject(new Error('Failed to load jsPDF'));
-                    document.head.appendChild(jsPDFScript);
-                });
 
                 // Initialize Firebase
                 const firebaseConfig = {
@@ -328,14 +328,12 @@
                     messagingSenderId: "623460884698",
                     appId: "1:623460884698:web:a08bd435c453a7b4db05e3"
                 };
-                const app = firebase.initializeApp(firebaseConfig);
-                const auth = firebase.auth(app);
-                const db = firebase.firestore(app);
+                app = firebase.initializeApp(firebaseConfig);
+                auth = firebase.auth(app);
+                db = firebase.firestore(app);
 
                 // Verify Firebase initialization
-                if (!auth || !db) {
-                    throw new Error('Firebase initialization failed');
-                }
+                if (!auth || !db) throw new Error('Firebase initialization failed');
                 console.log('Firebase initialized successfully');
 
                 // Geolocation settings
@@ -346,21 +344,19 @@
                 let currentUserId = '';
                 let geolocationWatcher = null;
 
-                // Request notification permission with mobile-friendly handling
+                // Request notification permission
                 if ('Notification' in window) {
                     Notification.requestPermission().then(permission => {
                         if (permission !== 'granted') {
                             document.getElementById('status').innerHTML = 'Notifications disabled. Login prompts may not appear.';
                         }
-                    }).catch(error => {
-                        console.error('Notification permission error:', error);
-                    });
+                    }).catch(error => console.error('Notification permission error:', error));
                 } else {
                     console.warn('Notifications not supported on this device.');
                 }
 
-                // Toggle between signup and login forms
-                window.showSignup = function() {
+                // Toggle forms
+                window.showSignup = () => {
                     const loginForm = document.getElementById('login-form');
                     const signupForm = document.getElementById('signup-form');
                     if (loginForm && signupForm) {
@@ -368,12 +364,10 @@
                         signupForm.classList.remove('hidden');
                         document.getElementById('login-username').value = '';
                         document.getElementById('login-password').value = '';
-                    } else {
-                        console.error('Login or signup form not found');
                     }
                 };
 
-                window.showLogin = function() {
+                window.showLogin = () => {
                     const signupForm = document.getElementById('signup-form');
                     const loginForm = document.getElementById('login-form');
                     if (signupForm && loginForm) {
@@ -383,15 +377,13 @@
                         document.getElementById('signup-password').value = '';
                         document.getElementById('signup-work-address').value = '';
                         document.getElementById('signup-hourly-rate').value = '';
-                    } else {
-                        console.error('Signup or login form not found');
                     }
                 };
 
                 // Handle signup
-                window.handleSignup = async function() {
+                window.handleSignup = async () => {
                     if (!geocoder) {
-                        alert('Geocoder not initialized. Please try again or refresh the page.');
+                        alert('Geocoder not initialized. Please refresh the page.');
                         return;
                     }
                     const username = document.getElementById('signup-username')?.value.trim();
@@ -399,49 +391,28 @@
                     const workAddress = document.getElementById('signup-work-address')?.value.trim();
                     const hourlyRate = parseFloat(document.getElementById('signup-hourly-rate')?.value);
 
-                    if (!username || username.length < 3) {
-                        alert('Username must be at least 3 characters long.');
-                        return;
-                    }
-                    if (!password || password.length < 6) {
-                        alert('Password must be at least 6 characters long.');
-                        return;
-                    }
-                    if (!workAddress) {
-                        alert('Please enter a valid work address (e.g., 123 Main St, Los Angeles, CA).');
-                        return;
-                    }
-                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
-                        alert('Please enter a valid hourly rate greater than 0.');
-                        return;
-                    }
+                    if (!username || username.length < 3) return alert('Username must be at least 3 characters.');
+                    if (!password || password.length < 6) return alert('Password must be at least 6 characters.');
+                    if (!workAddress) return alert('Please enter a work address.');
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) return alert('Please enter a valid hourly rate.');
 
                     try {
-                        const user = auth.currentUser;
-                        if (user) await auth.signOut();
-
+                        if (auth.currentUser) await auth.signOut();
                         const email = `${username.toLowerCase()}@timetracker.app`;
                         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
                         const userId = userCredential.user.uid;
 
                         const result = await new Promise((resolve, reject) => {
                             geocoder.geocode({ address: workAddress }, (results, status) => {
-                                if (status === 'OK') resolve(results[0].geometry.location);
-                                else reject(`Geocoding failed: ${status}`);
+                                status === 'OK' ? resolve(results[0].geometry.location) : reject(`Geocoding failed: ${status}`);
                             });
                         });
 
-                        const lat = result.lat();
-                        const lng = result.lng();
-                        if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-                            throw new Error('Invalid geolocation coordinates');
-                        }
+                        const lat = result.lat(), lng = result.lng();
+                        if (!lat || !lng || isNaN(lat) || isNaN(lng)) throw new Error('Invalid geolocation coordinates');
 
                         await db.collection('trackerUsers').doc(userId).set({
-                            username,
-                            workAddress,
-                            workLocation: { lat, lng },
-                            hourlyRate,
+                            username, workAddress, workLocation: { lat, lng }, hourlyRate,
                             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
                         console.log('Profile saved for userId:', userId);
@@ -449,22 +420,19 @@
                         currentUserId = userId;
                         workLocation = { lat, lng };
                         showTrackerSection(username, workAddress, hourlyRate);
-                        document.getElementById('status').innerHTML = `Profile created for ${username}. Welcome!`;
+                        document.getElementById('status').innerHTML = `Profile created for ${username}.`;
                     } catch (error) {
                         console.error('Signup error:', error);
-                        alert(`Error creating profile: ${error.message}`);
+                        alert(`Signup failed: ${error.message}`);
                     }
                 };
 
                 // Handle login
-                window.handleLogin = async function(maxRetries = 2, delay = 2000) {
+                window.handleLogin = async (maxRetries = 2, delay = 2000) => {
                     const username = document.getElementById('login-username')?.value.trim();
                     const password = document.getElementById('login-password')?.value;
 
-                    if (!username || !password) {
-                        alert('Please enter both username and password.');
-                        return;
-                    }
+                    if (!username || !password) return alert('Please enter username and password.');
 
                     for (let attempt = 1; attempt <= maxRetries; attempt++) {
                         try {
@@ -478,7 +446,7 @@
                                 currentUserId = userId;
                                 workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
                                 showTrackerSection(data.username, data.workAddress, data.hourlyRate);
-                                document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
+                                document.getElementById('status').innerHTML = `Welcome, ${data.username}`;
                                 console.log(`Login successful on attempt ${attempt} for userId: ${userId}`);
                                 return;
                             } else {
@@ -487,18 +455,18 @@
                                 return;
                             }
                         } catch (error) {
-                            console.error(`Login attempt ${attempt} error:`, error);
+                            console.error(`Login attempt ${attempt} error:`, error.code, error.message);
                             if (attempt === maxRetries) {
-                                alert(`Error logging in: ${error.message}. Please check your credentials or internet connection.`);
+                                alert(`Login failed: ${error.message}. Check credentials or internet.`);
                             } else {
-                                await new Promise(resolve => setTimeout(resolve, delay)); // Wait before retry
+                                await new Promise(resolve => setTimeout(resolve, delay));
                             }
                         }
                     }
                 };
 
                 // Handle sign out
-                window.handleSignOut = async function() {
+                window.handleSignOut = async () => {
                     try {
                         if (geolocationWatcher) {
                             navigator.geolocation.clearWatch(geolocationWatcher);
@@ -512,7 +480,7 @@
                         document.getElementById('status').innerHTML = 'Signed out successfully.';
                     } catch (error) {
                         console.error('Sign out error:', error);
-                        alert(`Error signing out: ${error.message}`);
+                        alert(`Sign out failed: ${error.message}`);
                     }
                 };
 
@@ -526,153 +494,106 @@
                         document.getElementById('display-username').textContent = username;
                         document.getElementById('display-work-address').textContent = workAddress;
                         document.getElementById('hourly-rate').value = hourlyRate || 0;
-                    } else {
-                        console.error('Tracker section or auth section not found');
                     }
                 }
 
                 // Update hourly rate
-                window.updateHourlyRate = async function() {
+                window.updateHourlyRate = async () => {
                     const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
-                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
-                        alert('Please enter a valid hourly rate greater than 0.');
-                        return;
-                    }
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) return alert('Invalid hourly rate.');
                     try {
                         await db.collection('trackerUsers').doc(currentUserId).update({
-                            hourlyRate,
-                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            hourlyRate, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
-                        console.log('Hourly rate updated:', hourlyRate);
-                        document.getElementById('status').innerHTML = `Hourly rate updated to $${hourlyRate}`;
+                        document.getElementById('status').innerHTML = `Rate updated to $${hourlyRate}`;
                     } catch (error) {
-                        console.error('Update hourly rate error:', error);
-                        alert(`Error updating hourly rate: ${error.message}`);
+                        console.error('Update rate error:', error);
+                        alert(`Update failed: ${error.message}`);
                     }
                 };
 
-                // Check location periodically
+                // Check location
                 function checkLocation() {
-                    if (geolocationWatcher) {
-                        navigator.geolocation.clearWatch(geolocationWatcher);
-                    }
+                    if (geolocationWatcher) navigator.geolocation.clearWatch(geolocationWatcher);
                     geolocationWatcher = navigator.geolocation.watchPosition(
-                        position => {
-                            const userLat = position.coords.latitude;
-                            const userLng = position.coords.longitude;
+                        pos => {
+                            const { latitude: userLat, longitude: userLng } = pos.coords;
                             const distance = getDistance(userLat, userLng, workLocation.lat, workLocation.lng);
                             if (distance <= geofenceRadius && !isLoggedIn && currentUserId) {
-                                new Notification('Time to log in!', {
-                                    body: 'You have arrived at your work location.'
-                                });
-                                document.getElementById('status').innerHTML = 'Please log in to start tracking time.';
+                                new Notification('Time to log in!', { body: 'Arrived at work.' });
+                                document.getElementById('status').innerHTML = 'Log in to start tracking.';
                             }
                         },
                         error => {
                             console.error('Geolocation error:', error);
-                            document.getElementById('status').innerHTML = 'Unable to access location. Please log in manually.';
+                            document.getElementById('status').innerHTML = 'Location access failed. Log in manually.';
                         },
                         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
                     );
                 }
 
-                // Calculate distance in meters
+                // Calculate distance
                 function getDistance(lat1, lon1, lat2, lon2) {
                     const R = 6371e3;
-                    const φ1 = lat1 * Math.PI / 180;
-                    const φ2 = lat2 * Math.PI / 180;
-                    const Δφ = (lat2 - lat1) * Math.PI / 180;
-                    const Δλ = (lon2 - lon1) * Math.PI / 180;
-                    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                              Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                    const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+                    const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lon2 - lon1) * Math.PI / 180;
+                    const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2;
                     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
                     return R * c;
                 }
 
                 // Handle time login
-                window.handleTimeLogin = async function() {
-                    if (isLoggedIn) {
-                        alert('Already logged in!');
-                        return;
-                    }
+                window.handleTimeLogin = async () => {
+                    if (isLoggedIn) return alert('Already logged in!');
                     const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
-                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
-                        alert('Please enter a valid hourly rate.');
-                        return;
-                    }
-
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) return alert('Invalid hourly rate.');
                     try {
                         loginTime = new Date();
                         isLoggedIn = true;
                         document.getElementById('login-btn').disabled = true;
                         document.getElementById('logout-btn').disabled = false;
-                        document.getElementById('status').innerHTML = `Logged in at ${loginTime.toLocaleString()}`;
+                        document.getElementById('status').innerHTML = `Shift started at ${loginTime.toLocaleTimeString()}`;
 
-                        const entryData = {
-                            type: 'login',
-                            userId: currentUserId,
-                            timestamp: firebase.firestore.Timestamp.fromDate(loginTime),
-                            hourlyRate,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        };
-                        await db.collection('trackerTimeEntries').add(entryData);
-                        console.log('Time entry added:', entryData);
+                        await db.collection('trackerTimeEntries').add({
+                            type: 'login', userId: currentUserId, timestamp: firebase.firestore.Timestamp.fromDate(loginTime),
+                            hourlyRate, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
                     } catch (error) {
                         console.error('Time login error:', error);
-                        alert(`Error logging time: ${error.message}`);
+                        alert(`Login failed: ${error.message}`);
                     }
                 };
 
                 // Handle time logout
-                window.handleTimeLogout = async function() {
-                    if (!isLoggedIn) {
-                        alert('Not logged in!');
-                        return;
-                    }
+                window.handleTimeLogout = async () => {
+                    if (!isLoggedIn) return alert('Not logged in!');
                     try {
                         const logoutTime = new Date();
                         const hoursWorked = (logoutTime - loginTime) / (1000 * 60 * 60);
                         isLoggedIn = false;
                         document.getElementById('login-btn').disabled = false;
                         document.getElementById('logout-btn').disabled = true;
-                        document.getElementById('status').innerHTML = `Logged out at ${logoutTime.toLocaleString()}. Hours worked: ${hoursWorked.toFixed(2)}`;
+                        document.getElementById('status').innerHTML = `Shift ended at ${logoutTime.toLocaleTimeString()}. Hours: ${hoursWorked.toFixed(2)}`;
 
-                        const entryData = {
-                            type: 'logout',
-                            userId: currentUserId,
-                            timestamp: firebase.firestore.Timestamp.fromDate(logoutTime),
-                            hoursWorked,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        };
-                        await db.collection('trackerTimeEntries').add(entryData);
-                        console.log('Time entry added:', entryData);
-
-                        new Notification('Time to log out!', {
-                            body: 'Your work shift has ended.'
+                        await db.collection('trackerTimeEntries').add({
+                            type: 'logout', userId: currentUserId, timestamp: firebase.firestore.Timestamp.fromDate(logoutTime),
+                            hoursWorked, createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
+                        new Notification('Shift Ended', { body: 'Your shift has ended.' });
                     } catch (error) {
                         console.error('Time logout error:', error);
-                        alert(`Error logging time: ${error.message}`);
+                        alert(`Logout failed: ${error.message}`);
                     }
                 };
 
                 // Generate payment report
-                window.generateReport = async function() {
-                    if (!currentUserId) {
-                        alert('Please log in first.');
-                        return;
-                    }
+                window.generateReport = async () => {
+                    if (!currentUserId) return alert('Please log in first.');
                     const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
-                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) {
-                        alert('Please enter a valid hourly rate.');
-                        return;
-                    }
-
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) return alert('Invalid hourly rate.');
                     try {
                         const userDoc = await db.collection('trackerUsers').doc(currentUserId).get();
-                        const username = document.getElementById('display-username').textContent;
-
-                        if (!userDoc.exists || userDoc.data().username !== username) {
+                        if (!userDoc.exists || userDoc.data().username !== document.getElementById('display-username').textContent) {
                             throw new Error('User profile mismatch');
                         }
 
@@ -685,77 +606,50 @@
                         let totalHours = 0;
                         entries.forEach(doc => {
                             const hours = doc.data().hoursWorked;
-                            if (hours && !isNaN(hours)) {
-                                totalHours += hours;
-                            }
+                            if (hours && !isNaN(hours)) totalHours += hours;
                         });
 
                         const totalPay = totalHours * hourlyRate;
-
+                        const username = document.getElementById('display-username').textContent;
                         document.getElementById('report').innerHTML = `
-                            <h3>Payment Report for ${username}</h3>
-                            <p>Total Hours: ${totalHours.toFixed(2)}</p>
-                            <p>Total Pay: $${totalPay.toFixed(2)}</p>
-                            <button id="download-pdf-btn">Download PDF</button>
-                            <button id="reset-btn">Reset Hours</button>
+                            <h3>Report for ${username}</h3>
+                            <p>Hours: ${totalHours.toFixed(2)}</p>
+                            <p>Pay: $${totalPay.toFixed(2)}</p>
+                            <button id="download-pdf-btn">Download</button>
+                            <button id="reset-btn">Reset</button>
                         `;
-
-                        document.getElementById('download-pdf-btn')?.addEventListener('click', () => {
-                            downloadReport(totalHours, totalPay, username);
-                        });
-                        document.getElementById('reset-btn')?.addEventListener('click', resetHours);
-
-                        console.log('Report generated:', { totalHours, totalPay });
+                        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReport(totalHours, totalPay, username));
+                        document.getElementById('reset-btn').addEventListener('click', resetHours);
                     } catch (error) {
                         console.error('Report error:', error);
-                        if (error.code === 'unavailable' || error.message.includes('index')) {
-                            alert('Error generating report: The query requires an index. Please create it in the Firebase Console.');
-                        } else {
-                            alert(`Error generating report: ${error.message}`);
-                        }
+                        alert(`Report failed: ${error.message.includes('index') ? 'Index required. Create it in Firebase Console.' : error.message}`);
                     }
                 };
 
                 // Download PDF report
-                window.downloadReport = function(totalHours, totalPay, username) {
+                window.downloadReport = (totalHours, totalPay, username) => {
                     const { jsPDF } = window.jspdf;
                     const doc = new jsPDF();
-
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(16);
-                    doc.text(`Payment Report`, 10, 20);
-
-                    doc.setFont("helvetica", "normal");
-                    doc.setFontSize(12);
-                    doc.text(`Name: ${username}`, 10, 35);
-                    doc.text(`Total Hours Worked: ${totalHours.toFixed(2)} hrs`, 10, 45);
-                    doc.text(`Total Pay: $${totalPay.toFixed(2)}`, 10, 55);
-
-                    const date = new Date().toISOString().split('T')[0];
-                    doc.save(`payment_report_${username}_${date}.pdf`);
+                    doc.text(`Time Tracker Report`, 10, 10);
+                    doc.text(`Name: ${username}`, 10, 20);
+                    doc.text(`Hours: ${totalHours.toFixed(2)}`, 10, 30);
+                    doc.text(`Pay: $${totalPay.toFixed(2)}`, 10, 40);
+                    doc.save(`report_${username}_${new Date().toISOString().split('T')[0]}.pdf`);
                 };
 
                 // Reset hours
-                window.resetHours = async function() {
-                    if (!currentUserId) {
-                        alert('Please log in first.');
-                        return;
-                    }
-                    if (confirm('Are you sure you want to reset all hours after payment?')) {
+                window.resetHours = async () => {
+                    if (!currentUserId) return alert('Please log in first.');
+                    if (confirm('Reset all hours?')) {
                         try {
-                            const entries = await db.collection('trackerTimeEntries')
-                                .where('userId', '==', currentUserId)
-                                .get();
+                            const snapshot = await db.collection('trackerTimeEntries').where('userId', '==', currentUserId).get();
                             const batch = db.batch();
-                            entries.forEach(doc => {
-                                batch.delete(doc.ref);
-                            });
+                            snapshot.forEach(doc => batch.delete(doc.ref));
                             await batch.commit();
-                            console.log('All time entries deleted for user:', currentUserId);
-                            document.getElementById('report').innerHTML = 'Hours reset successfully.';
+                            document.getElementById('report').innerHTML = 'Hours reset.';
                         } catch (error) {
-                            console.error('Reset hours error:', error);
-                            alert(`Error resetting hours: ${error.message}`);
+                            console.error('Reset error:', error);
+                            alert(`Reset failed: ${error.message}`);
                         }
                     }
                 };
@@ -768,26 +662,23 @@
                     if (user) {
                         db.collection('trackerUsers').doc(user.uid).get().then(doc => {
                             if (doc.exists) {
-                                const data = doc.data();
+                                const { username, workAddress, hourlyRate, workLocation } = doc.data();
                                 currentUserId = user.uid;
-                                workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
-                                showTrackerSection(data.username, data.workAddress, data.hourlyRate);
-                                document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
+                                workLocation = workLocation || { lat: 33.9416, lng: -118.4085 };
+                                showTrackerSection(username, workAddress, hourlyRate);
+                                document.getElementById('status').innerHTML = `Welcome, ${username}`;
                                 checkLocation();
                             }
-                        }).catch(error => {
-                            console.error('Profile load error:', error);
-                            document.getElementById('status').innerHTML = `Error loading profile: ${error.message}`);
-                        });
+                        }).catch(error => console.error('Profile load error:', error));
                     } else {
                         document.getElementById('auth-section').classList.remove('hidden');
                         document.getElementById('tracker-section').classList.add('hidden');
                     }
                 });
             } catch (error) {
-                console.error('Error initializing app:', error);
-                alert(`Error initializing app: ${error.message}. Please check your internet connection, ensure the API key is valid, or refresh the page. The app will retry in 5 seconds.`);
-                setTimeout(() => window.location.reload(), 5000); // Retry after 5 seconds
+                console.error('Initialization error:', error);
+                alert(`App failed to start: ${error.message}. Retrying in 5 seconds...`);
+                setTimeout(() => location.reload(), 5000);
             }
         });
     </script>
