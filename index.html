@@ -344,13 +344,21 @@
                 let currentUserId = '';
                 let geolocationWatcher = null;
 
-                // Request notification permission
+                // Request notification permission with user prompt
                 if ('Notification' in window) {
-                    Notification.requestPermission().then(permission => {
-                        if (permission !== 'granted') {
-                            document.getElementById('status').innerHTML = 'Notifications disabled.';
-                        }
-                    }).catch(error => console.error('Notification permission error:', error));
+                    if (Notification.permission === 'default') {
+                        document.getElementById('status').innerHTML = 'Please enable notifications in your browser settings for shift alerts.';
+                    } else if (Notification.permission === 'denied') {
+                        document.getElementById('status').innerHTML = 'Notifications are blocked. Enable them in settings to receive alerts.';
+                    } else {
+                        Notification.requestPermission().then(permission => {
+                            if (permission !== 'granted') {
+                                document.getElementById('status').innerHTML = 'Notifications disabled.';
+                            }
+                        }).catch(error => console.error('Notification permission error:', error));
+                    }
+                } else {
+                    document.getElementById('status').innerHTML = 'Notifications not supported on this device.';
                 }
 
                 // Toggle forms
@@ -592,11 +600,13 @@
                             hoursWorked, createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
 
-                        // Check for Notification support before creating
+                        // Check for Notification support and permission
                         if ('Notification' in window && Notification.permission === 'granted') {
                             new Notification('Shift Ended', { body: 'Your shift has ended.' });
+                        } else if (Notification.permission === 'default') {
+                            document.getElementById('status').innerHTML += ' (Please enable notifications in settings for alerts.)';
                         } else {
-                            document.getElementById('status').innerHTML += ' (Notification not supported or permission denied.)';
+                            document.getElementById('status').innerHTML += ' (Notifications not supported or denied.)';
                         }
                     } catch (error) {
                         console.error('Time logout error:', error);
