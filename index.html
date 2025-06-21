@@ -442,7 +442,7 @@
                 };
 
                 // Handle login
-                window.handleLogin = async (maxRetries = 2, delay = 2000) => {
+                window.handleLogin = async () => {
                     const username = document.getElementById('login-username')?.value.trim();
                     const password = document.getElementById('login-password')?.value;
 
@@ -451,51 +451,28 @@
                         return;
                     }
 
-                    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                        try {
-                            const email = `${username.toLowerCase()}@timetracker.app`;
-                            console.log(`Attempting login with email: ${email}, attempt ${attempt}`); // Debug log
-                            const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                            const userId = userCredential.user.uid;
+                    try {
+                        const email = `${username.toLowerCase()}@timetracker.app`;
+                        console.log('Attempting login with email:', email); // Debug log
+                        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                        const userId = userCredential.user.uid;
 
-                            // Simplify session management for testing
-                            const sessionRef = db.collection('activeSessions').doc(userId);
-                            await sessionRef.set({
-                                lastActive: firebase.firestore.FieldValue.serverTimestamp(),
-                                userId
-                            }, { merge: true });
-
-                            const doc = await db.collection('trackerUsers').doc(userId).get();
-                            if (doc.exists) {
-                                const data = doc.data();
-                                currentUserId = userId;
-                                workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
-                                showTrackerSection(data.username, data.workAddress, data.hourlyRate);
-                                document.getElementById('status').innerHTML = `Welcome, ${data.username}`;
-                                console.log(`Login successful on attempt ${attempt} for userId: ${userId}`);
-                                return;
-                            } else {
-                                alert('Profile not found. Please sign up.');
-                                await auth.signOut();
-                                return;
-                            }
-                        } catch (error) {
-                            console.error(`Login attempt ${attempt} error:`, error.code, error.message);
-                            if (attempt === maxRetries) {
-                                alert(`Login failed: ${error.message} (Code: ${error.code}). Check credentials, internet, or contact support.`);
-                            } else {
-                                await new Promise(resolve => setTimeout(resolve, delay));
-                            }
+                        const doc = await db.collection('trackerUsers').doc(userId).get();
+                        if (doc.exists) {
+                            const data = doc.data();
+                            currentUserId = userId;
+                            workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
+                            showTrackerSection(data.username, data.workAddress, data.hourlyRate);
+                            document.getElementById('status').innerHTML = `Welcome, ${data.username}`;
+                            console.log('Login successful for userId:', userId);
+                        } else {
+                            alert('Profile not found. Please sign up.');
+                            await auth.signOut();
                         }
+                    } catch (error) {
+                        console.error('Login error:', error.code, error.message);
+                        alert(`Login failed: ${error.message} (Code: ${error.code}). Check credentials or internet.`);
                     }
-
-                    // Fallback if login fails
-                    console.log('Login attempt failed after retries, resetting form visibility');
-                    document.getElementById('auth-section').classList.remove('hidden');
-                    document.getElementById('tracker-section').classList.add('hidden');
-                    document.getElementById('login-username').value = '';
-                    document.getElementById('login-password').value = '';
-                    document.getElementById('status').innerHTML = 'Login failed. Please try again or verify credentials.';
                 };
 
                 // Handle sign out
@@ -504,19 +481,6 @@
                         if (geolocationWatcher) {
                             navigator.geolocation.clearWatch(geolocationWatcher);
                             geolocationWatcher = null;
-                        }
-                        if (currentUserId) {
-                            const sessionRef = db.collection('activeSessions').doc(currentUserId);
-                            try {
-                                await sessionRef.delete();
-                                console.log(`Session deleted for userId: ${currentUserId}`);
-                            } catch (sessionError) {
-                                if (sessionError.code === 'permission-denied') {
-                                    console.warn('Permission denied to delete session, proceeding with sign-out:', sessionError);
-                                } else {
-                                    throw sessionError;
-                                }
-                            }
                         }
                         await auth.signOut();
                         currentUserId = '';
@@ -528,7 +492,7 @@
                         document.getElementById('login-password').value = '';
                     } catch (error) {
                         console.error('Sign out error:', error.code, error.message);
-                        alert(`Sign out failed: ${error.message} (Code: ${error.code}). Please try again or refresh.`);
+                        alert(`Sign out failed: ${error.message} (Code: ${error.code}).`);
                     }
                 };
 
@@ -705,36 +669,25 @@
                 // Attach event listeners
                 attachEventListeners();
 
-                // Auth state listener with session conflict handling
-                auth.onAuthStateChanged(async (user) => {
-                    if (user && currentUserId) {
-                        const sessionRef = db.collection('activeSessions').doc(currentUserId);
-                        const sessionDoc = await sessionRef.get();
-                        if (!sessionDoc.exists || sessionDoc.data().userId !== currentUserId) {
-                            await handleSignOut(); // Logout if session conflict detected
-                            alert('You have been logged out from another device.');
-                        } else {
-                            db.collection('trackerUsers').doc(currentUserId).get().then(doc => {
-                                if (doc.exists) {
-                                    const { username, workAddress, hourlyRate, workLocation } = doc.data();
-                                    workLocation = workLocation || { lat: 33.9416, lng: -118.4085 };
-                                    showTrackerSection(username, workAddress, hourlyRate);
-                                    document.getElementById('status').innerHTML = `Welcome, ${username}`;
-                                    checkLocation();
-                                }
-                            }).catch(error => console.error('Profile load error:', error));
-                        }
-                    } else if (!user) {
-                        if (currentUserId) {
-                            console.log('Auth state changed to null, resetting UI');
-                            document.getElementById('auth-section').classList.remove('hidden');
-                            document.getElementById('tracker-section').classList.add('hidden');
-                            document.getElementById('status').innerHTML = 'Please log in.';
-                            document.getElementById('login-username').value = '';
-                            document.getElementById('login-password').value = '';
-                        }
+                // Auth state listener
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        db.collection('trackerUsers').doc(user.uid).get().then(doc => {
+                            if (doc.exists) {
+                                const data = doc.data();
+                                currentUserId = user.uid;
+                                workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
+                                showTrackerSection(data.username, data.workAddress, data.hourlyRate);
+                                document.getElementById('status').innerHTML = `Welcome, ${data.username}`;
+                                checkLocation();
+                            }
+                        }).catch(error => {
+                            console.error('Profile load error:', error);
+                            document.getElementById('status').innerHTML = `Error loading profile: ${error.message}`;
+                        });
                     } else {
-                        console.log('Auth state changed, no user or currentUserId set');
+                        document.getElementById('auth-section').classList.remove('hidden');
+                        document.getElementById('tracker-section').classList.add('hidden');
                     }
                 });
             } catch (error) {
