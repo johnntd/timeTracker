@@ -603,3 +603,99 @@
 
                 // Generate payment report
                 window.generateReport = async () => {
+                    if (!currentUserId) return alert('Please log in first.');
+                    const hourlyRate = parseFloat(document.getElementById('hourly-rate')?.value);
+                    if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) return alert('Invalid hourly rate.');
+                    try {
+                        const userDoc = await db.collection('trackerUsers').doc(currentUserId).get();
+                        if (!userDoc.exists || userDoc.data().username !== document.getElementById('display-username').textContent) {
+                            throw new Error('User profile mismatch');
+                        }
+
+                        const entries = await db.collection('trackerTimeEntries')
+                            .where('type', '==', 'logout')
+                            .where('userId', '==', currentUserId)
+                            .orderBy('createdAt', 'desc')
+                            .get();
+
+                        let totalHours = 0;
+                        entries.forEach(doc => {
+                            const hours = doc.data().hoursWorked;
+                            if (hours && !isNaN(hours)) totalHours += hours;
+                        });
+
+                        const totalPay = totalHours * hourlyRate;
+                        const username = document.getElementById('display-username').textContent;
+                        document.getElementById('report').innerHTML = `
+                            <h3>Report for ${username}</h3>
+                            <p>Hours: ${totalHours.toFixed(2)}</p>
+                            <p>Pay: $${totalPay.toFixed(2)}</p>
+                            <button id="download-pdf-btn">Download</button>
+                            <button id="reset-btn">Reset</button>
+                        `;
+                        document.getElementById('download-pdf-btn').addEventListener('click', () => downloadReport(totalHours, totalPay, username));
+                        document.getElementById('reset-btn').addEventListener('click', resetHours);
+                    } catch (error) {
+                        console.error('Report error:', error);
+                        alert(`Report failed: ${error.message.includes('index') ? 'Index required. Create it in Firebase Console.' : error.message}`);
+                    }
+                };
+
+                // Download PDF report
+                window.downloadReport = (totalHours, totalPay, username) => {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF();
+                    doc.text(`Time Tracker Report`, 10, 10);
+                    doc.text(`Name: ${username}`, 10, 20);
+                    doc.text(`Hours: ${totalHours.toFixed(2)}`, 10, 30);
+                    doc.text(`Pay: $${totalPay.toFixed(2)}`, 10, 40);
+                    doc.save(`report_${username}_${new Date().toISOString().split('T')[0]}.pdf`);
+                };
+
+                // Reset hours
+                window.resetHours = async () => {
+                    if (!currentUserId) return alert('Please log in first.');
+                    if (confirm('Reset all hours?')) {
+                        try {
+                            const snapshot = await db.collection('trackerTimeEntries').where('userId', '==', currentUserId).get();
+                            const batch = db.batch();
+                            snapshot.forEach(doc => batch.delete(doc.ref));
+                            await batch.commit();
+                            document.getElementById('report').innerHTML = 'Hours reset.';
+                        } catch (error) {
+                            console.error('Reset error:', error);
+                            alert(`Reset failed: ${error.message}`);
+                        }
+                    }
+                };
+
+                // Attach event listeners
+                attachEventListeners();
+
+                // Auth state listener
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        db.collection('trackerUsers').doc(user.uid).get().then(doc => {
+                            if (doc.exists) {
+                                const { username, workAddress, hourlyRate, workLocation } = doc.data();
+                                currentUserId = user.uid;
+                                workLocation = workLocation || { lat: 33.9416, lng: -118.4085 };
+                                showTrackerSection(username, workAddress, hourlyRate);
+                                document.getElementById('status').innerHTML = `Welcome, ${username}`;
+                                checkLocation();
+                            }
+                        }).catch(error => console.error('Profile load error:', error));
+                    } else {
+                        document.getElementById('auth-section').classList.remove('hidden');
+                        document.getElementById('tracker-section').classList.add('hidden');
+                    }
+                });
+            } catch (error) {
+                console.error('Initialization error:', error);
+                alert(`App failed to start: ${error.message}. Retrying in 5 seconds...`);
+                setTimeout(() => location.reload(), 5000);
+            }
+        });
+    </script>
+</body>
+</html>
