@@ -115,11 +115,7 @@
             }
         }
     </style>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- Google Maps API loaded dynamically -->
+    <!-- Scripts loaded dynamically -->
 </head>
 <body>
     <header>
@@ -195,30 +191,38 @@
     <script>
         let geocoder;
 
-        function loadGoogleMapsAPI() {
-            return new Promise((resolve, reject) => {
-                if (window.google && window.google.maps && window.google.maps.Geocoder) {
-                    geocoder = new google.maps.Geocoder();
-                    console.log('Google Maps API already loaded with Geocoder');
-                    resolve();
-                    return;
-                }
-
-                const script = document.createElement('script');
-                script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAhuG4Bg-PBtG2JdnrZYj6ZLb2HXG1RNF4&libraries=places&loading=async`;
-                script.async = true;
-                script.onload = () => {
+        async function loadGoogleMapsAPI(maxRetries = 3, delay = 2000) {
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
                     if (window.google && window.google.maps && typeof google.maps.Geocoder === 'function') {
                         geocoder = new google.maps.Geocoder();
-                        console.log('Google Maps API loaded successfully with Geocoder');
-                        resolve();
-                    } else {
-                        reject(new Error('Google Maps API loaded but Geocoder not available as a constructor'));
+                        console.log(`Google Maps API loaded successfully on attempt ${attempt}`);
+                        return;
                     }
-                };
-                script.onerror = () => reject(new Error('Failed to load Google Maps API'));
-                document.head.appendChild(script);
-            });
+
+                    const script = document.createElement('script');
+                    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAhuG4Bg-PBtG2JdnrZYj6ZLb2HXG1RNF4&libraries=places&loading=async`;
+                    script.async = true;
+                    await new Promise((resolve, reject) => {
+                        script.onload = () => {
+                            if (window.google && window.google.maps && typeof google.maps.Geocoder === 'function') {
+                                geocoder = new google.maps.Geocoder();
+                                console.log(`Google Maps API loaded successfully on attempt ${attempt}`);
+                                resolve();
+                            } else {
+                                reject(new Error('Google Maps API loaded but Geocoder not available as a constructor'));
+                            }
+                        };
+                        script.onerror = () => reject(new Error('Failed to load Google Maps API'));
+                        document.head.appendChild(script);
+                    });
+                    return; // Exit if successful
+                } catch (error) {
+                    console.error(`Attempt ${attempt} to load Google Maps API failed:`, error);
+                    if (attempt === maxRetries) throw error;
+                    await new Promise(resolve => setTimeout(resolve, delay)); // Wait before retry
+                }
+            }
         }
 
         function attachEventListeners() {
@@ -279,10 +283,43 @@
 
         document.addEventListener('DOMContentLoaded', async () => {
             try {
-                // Load Google Maps API
+                // Load Google Maps API with retry
                 await loadGoogleMapsAPI();
 
-                // Firebase configuration
+                // Load Firebase and other dependencies
+                const firebaseScript = document.createElement('script');
+                firebaseScript.src = 'https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js';
+                await new Promise((resolve, reject) => {
+                    firebaseScript.onload = resolve;
+                    firebaseScript.onerror = () => reject(new Error('Failed to load Firebase App'));
+                    document.head.appendChild(firebaseScript);
+                });
+
+                const firebaseAuthScript = document.createElement('script');
+                firebaseAuthScript.src = 'https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js';
+                await new Promise((resolve, reject) => {
+                    firebaseAuthScript.onload = resolve;
+                    firebaseAuthScript.onerror = () => reject(new Error('Failed to load Firebase Auth'));
+                    document.head.appendChild(firebaseAuthScript);
+                });
+
+                const firebaseFirestoreScript = document.createElement('script');
+                firebaseFirestoreScript.src = 'https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js';
+                await new Promise((resolve, reject) => {
+                    firebaseFirestoreScript.onload = resolve;
+                    firebaseFirestoreScript.onerror = () => reject(new Error('Failed to load Firebase Firestore'));
+                    document.head.appendChild(firebaseFirestoreScript);
+                });
+
+                const jsPDFScript = document.createElement('script');
+                jsPDFScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                await new Promise((resolve, reject) => {
+                    jsPDFScript.onload = resolve;
+                    jsPDFScript.onerror = () => reject(new Error('Failed to load jsPDF'));
+                    document.head.appendChild(jsPDFScript);
+                });
+
+                // Initialize Firebase
                 const firebaseConfig = {
                     apiKey: "AIzaSyCo1FzDthSCXINRHlyJkqdcVKq_inM71SQ",
                     authDomain: "dulichcali-booking-calendar.firebaseapp.com",
@@ -292,8 +329,8 @@
                     appId: "1:623460884698:web:a08bd435c453a7b4db05e3"
                 };
                 const app = firebase.initializeApp(firebaseConfig);
-                const auth = firebase.auth(app); // Explicitly initialize auth with app instance
-                const db = firebase.firestore(app); // Explicitly initialize firestore with app instance
+                const auth = firebase.auth(app);
+                const db = firebase.firestore(app);
 
                 // Verify Firebase initialization
                 if (!auth || !db) {
@@ -420,7 +457,7 @@
                 };
 
                 // Handle login
-                window.handleLogin = async function() {
+                window.handleLogin = async function(maxRetries = 2, delay = 2000) {
                     const username = document.getElementById('login-username')?.value.trim();
                     const password = document.getElementById('login-password')?.value;
 
@@ -429,25 +466,34 @@
                         return;
                     }
 
-                    try {
-                        const email = `${username.toLowerCase()}@timetracker.app`;
-                        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-                        const userId = userCredential.user.uid;
+                    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                        try {
+                            const email = `${username.toLowerCase()}@timetracker.app`;
+                            const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                            const userId = userCredential.user.uid;
 
-                        const doc = await db.collection('trackerUsers').doc(userId).get();
-                        if (doc.exists) {
-                            const data = doc.data();
-                            currentUserId = userId;
-                            workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
-                            showTrackerSection(data.username, data.workAddress, data.hourlyRate);
-                            document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
-                        } else {
-                            alert('Profile not found. Please sign up.');
-                            await auth.signOut();
+                            const doc = await db.collection('trackerUsers').doc(userId).get();
+                            if (doc.exists) {
+                                const data = doc.data();
+                                currentUserId = userId;
+                                workLocation = data.workLocation || { lat: 33.9416, lng: -118.4085 };
+                                showTrackerSection(data.username, data.workAddress, data.hourlyRate);
+                                document.getElementById('status').innerHTML = `Welcome back, ${data.username}`;
+                                console.log(`Login successful on attempt ${attempt} for userId: ${userId}`);
+                                return;
+                            } else {
+                                alert('Profile not found. Please sign up.');
+                                await auth.signOut();
+                                return;
+                            }
+                        } catch (error) {
+                            console.error(`Login attempt ${attempt} error:`, error);
+                            if (attempt === maxRetries) {
+                                alert(`Error logging in: ${error.message}. Please check your credentials or internet connection.`);
+                            } else {
+                                await new Promise(resolve => setTimeout(resolve, delay)); // Wait before retry
+                            }
                         }
-                    } catch (error) {
-                        console.error('Login error:', error);
-                        alert(`Error logging in: ${error.message}`);
                     }
                 };
 
@@ -731,7 +777,7 @@
                             }
                         }).catch(error => {
                             console.error('Profile load error:', error);
-                            document.getElementById('status').innerHTML = `Error loading profile: ${error.message}`;
+                            document.getElementById('status').innerHTML = `Error loading profile: ${error.message}`);
                         });
                     } else {
                         document.getElementById('auth-section').classList.remove('hidden');
@@ -740,8 +786,7 @@
                 });
             } catch (error) {
                 console.error('Error initializing app:', error);
-                alert(`Error initializing app: ${error.message}. Please check your internet connection or refresh the page.`);
-                // Optional: Retry loading
+                alert(`Error initializing app: ${error.message}. Please check your internet connection, ensure the API key is valid, or refresh the page. The app will retry in 5 seconds.`);
                 setTimeout(() => window.location.reload(), 5000); // Retry after 5 seconds
             }
         });
