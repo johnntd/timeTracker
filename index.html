@@ -569,7 +569,7 @@
                     if (!hourlyRate || hourlyRate <= 0 || isNaN(hourlyRate)) return alert('Invalid hourly rate.');
                     try {
                         loginTime = new Date();
-                        console.log('Login time set:', loginTime); // Debug log
+                        console.log('Login time set:', loginTime.toISOString()); // Debug log with ISO format
                         isLoggedIn = true;
                         document.getElementById('login-btn').disabled = true;
                         document.getElementById('logout-btn').disabled = false;
@@ -590,12 +590,16 @@
                     if (!isLoggedIn) return alert('Not logged in!');
                     try {
                         const logoutTime = new Date();
-                        console.log('Logout time set:', logoutTime); // Debug log
+                        console.log('Logout time set:', logoutTime.toISOString()); // Debug log with ISO format
                         if (!loginTime || isNaN(loginTime.getTime())) {
                             throw new Error('Invalid login time recorded');
                         }
-                        const hoursWorked = (logoutTime - loginTime) / (1000 * 60 * 60);
-                        console.log('Calculated hours worked:', hoursWorked); // Debug log
+                        const timeDiffMs = logoutTime - loginTime;
+                        const hoursWorked = timeDiffMs / (1000 * 60 * 60);
+                        console.log('Time difference (ms):', timeDiffMs, 'Hours worked:', hoursWorked); // Debug log
+                        if (hoursWorked <= 0) {
+                            throw new Error('Invalid time difference detected');
+                        }
                         isLoggedIn = false;
                         document.getElementById('login-btn').disabled = false;
                         document.getElementById('logout-btn').disabled = true;
@@ -618,6 +622,8 @@
                         console.error('Time logout error:', error);
                         if (error.message.includes('Notification')) {
                             document.getElementById('status').innerHTML += ' (Notification failed; check browser support.)';
+                        } else if (error.message.includes('Invalid')) {
+                            document.getElementById('status').innerHTML += ' (Error calculating time; please try again.)';
                         } else {
                             alert(`Logout failed: ${error.message}`);
                         }
